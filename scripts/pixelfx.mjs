@@ -25,6 +25,12 @@ import snow from './sf/snow.mjs';
 import sparkle from './sf/sparkle.mjs';
 import { EXTRA } from './sf/extra.mjs';
 import { hex, resample } from './sf/kit.mjs';
+import { createFx } from './pfx/core/index.js';
+import * as fireBreath from './pfx/fx/fire/fire-breath.js';
+import * as waterJet from './pfx/fx/water/water-jet.js';
+import * as pfxTornado from './pfx/fx/nature/tornado.js';
+import * as pfxWisp from './pfx/fx/critters/wisp.js';
+import * as pfxPoof from './pfx/fx/spawn/poof.js';
 
 /**
  * The pixel effects: Sprite Fusion's open source pixel art VFX (scripts/sf), plus the ones drawn for this module
@@ -84,6 +90,23 @@ const nearby = (P, i, r = 34) => {
 	const d = r * (0.35 + ((i * 0.37) % 1) * 0.65);
 	return [P.x + Math.cos(a) * d, P.y + Math.sin(a) * d * 0.7];
 };
+
+/**
+ * An effect from the pixelfx library (scripts/pfx: patch-gg/pixelfx, MIT). Those draw in art pixels and face right;
+ * P is in Sprite Fusion units (2 per art pixel), so positions are halved, and a target to the left mirrors the
+ * effect instead of turning it upside down. Our palettes run bright to dark, theirs dark to bright.
+ */
+function lib(mod, P, at, { aim = false, ramp = true, ...opts } = {}) {
+	const o = { x: at[0] / 2, y: at[1] / 2, seed: (P.seed % 997) + 1, ...opts };
+	if (aim) {
+		o.flip = Math.cos(P.angle) < 0;
+		o.angle = o.flip ? P.angle - Math.PI : P.angle;
+	}
+	const n = mod.meta?.options?.palette?.length;
+	const pal = ramp && n ? P.hexRamp(n) : undefined;
+	if (pal) o.palette = [...pal].reverse();
+	return createFx(mod, o);
+}
 
 const W = 'Pixel Weather';
 
@@ -249,16 +272,16 @@ export const PIXEL = {
 		make: (P) => one(() => poison({ kind: 'aura', actor: P.target, ground: P.ground, colors: P.ramp(8), ...P.hook, seed: P.seed })),
 	},
 	'sf-breath': {
-		label: 'Breath', cat: 'Pixel Bolts', as: 'pr-breath', ramp: true, line: true, dur: 1, cap: 1.5, hit: 'hook', box: [-60, -60, 60, 60],
-		make: (P) => one(() => EXTRA.breath({ from: handOf(P), to: [P.x, P.y], ramp: P.ramp(9), ...P.hook, seed: P.seed })),
+		label: 'Breath', cat: 'Pixel Bolts', as: 'pr-breath', ramp: true, line: true, dur: 1.3, cap: 1.7, stopAt: 1.15, hit: 0.35, box: [-90, -70, 90, 60],
+		make: (P) => one(() => lib(fireBreath, P, handOf(P), { aim: true })),
 	},
 	'sf-jet': {
-		label: 'Jet stream', cat: 'Pixel Bolts', as: 'pr-jet', ramp: true, line: true, dur: 0.85, cap: 1.2, hit: 'hook', box: [-40, -40, 40, 40],
-		make: (P) => one(() => EXTRA.jet({ from: handOf(P), to: [P.x, P.y], ramp: P.ramp(8), ...P.hook, seed: P.seed })),
+		label: 'Jet stream', cat: 'Pixel Bolts', as: 'pr-jet', hue: 205, line: true, dur: 1.1, cap: 1.5, stopAt: 0.95, hit: 0.3, box: [-100, -50, 100, 50],
+		make: (P) => one(() => lib(waterJet, P, handOf(P), { aim: true, ramp: false })),
 	},
 	'sf-tornado': {
-		label: 'Whirlwind', cat: 'Pixel Elements', as: 'pr-tornado', ramp: true, dur: 1.2, cap: 1.5, hit: 0.1, box: [-45, -90, 45, 30],
-		make: (P) => one(() => EXTRA.tornado({ x: P.x, ground: P.ground, ramp: P.ramp(8), ...P.hook, seed: P.seed })),
+		label: 'Whirlwind', cat: 'Pixel Elements', as: 'pr-tornado', ramp: true, dur: 1.4, cap: 1.9, stopAt: 1.4, hit: 0.25, box: [-70, -110, 70, 30],
+		make: (P) => one(() => lib(pfxTornado, P, [P.x, P.ground], { height: 76 })),
 	},
 
 	/* ---- Magic ---- */
@@ -457,8 +480,8 @@ export const PIXEL = {
 		make: (P) => one(() => movement({ kind: 'dash', actor: P.target, facing: P.facing, ground: P.ground, ...P.hook, seed: P.seed })),
 	},
 	'sf-wisps': {
-		label: 'Spirit wisps', cat: 'Pixel Support', as: 'pr-wisps', ramp: true, dur: 1.3, cap: 1.6, hit: 0.2, box: [-45, -40, 45, 40],
-		make: (P) => one(() => EXTRA.wisps({ x: P.x, y: P.y, ramp: P.ramp(8), ...P.hook, seed: P.seed })),
+		label: 'Spirit wisps', cat: 'Pixel Support', as: 'pr-wisps', hue: 170, dur: 1.5, cap: 2, stopAt: 1.6, hit: 0.2, box: [-70, -110, 70, 30],
+		make: (P) => one(() => lib(pfxWisp, P, [P.x, P.ground], { ramp: false })),
 	},
 
 	/* ---- Status ---- */
@@ -499,8 +522,8 @@ export const PIXEL = {
 		make: (P) => one(() => EXTRA.notes({ x: P.x, y: P.y, size: 1.3, ramp: P.ramp(8), ...P.hook, seed: P.seed })),
 	},
 	'sf-smoke': {
-		label: 'Smoke puff', cat: 'Pixel Status', as: 'px-smoke-loop-1', dur: 1, cap: 1.3, hit: 0, box: [-50, -60, 50, 30],
-		make: (P) => one(() => EXTRA.smoke({ x: P.x, y: P.y, ...P.hook, seed: P.seed })),
+		label: 'Smoke puff', cat: 'Pixel Status', as: 'px-smoke-loop-1', dur: 1.2, cap: 1.6, hit: 0.05, box: [-60, -90, 60, 20],
+		make: (P) => one(() => lib(pfxPoof, P, [P.x, P.ground], { ramp: false })),
 	},
 	'sf-death': {
 		label: 'Death mark', cat: 'Pixel Status', as: 'px-death', dur: 1.4, cap: 1.7, hit: 0.3, box: [-60, -80, 60, 30],

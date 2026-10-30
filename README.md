@@ -69,6 +69,7 @@ World: melee attacks dash to the target, animate homebrew abilities, the ability
 ## Credits
 - Pixel Combat sound effects - Helton Yan
 - JB2A preset: plays effects from JB2A - Jules and Ben's Animated Assets (not included; install their module)
+- Original preset: breath, jet stream, whirlwind, spirit wisps and smoke puff from pixelfx (https://github.com/patch-gg/pixelfx), MIT License, Copyright (c) 2026 Patch and Hugo Duprez. Included in `scripts/pfx/` with the license next to it.
 - Original preset: Sprite Fusion's open source pixel art VFX (https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez. Included in `scripts/sf/` (converted to JavaScript), with the license next to them.
 
 The sound pack forbids redistributing its files. Keep this module private while the sfx folder is inside it.
