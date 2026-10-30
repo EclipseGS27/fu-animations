@@ -2,24 +2,32 @@
 
 Animations for Project FU (Foundry v13, Project FU 4.14+). Works on its own, and alongside Fabula Ultima Battle UI.
 
+![Pixel effects: breath, lightning, frost nova, explosion, whirlwind, pillar of light, shield dome, black hole](docs/effects.png)
+
+## Install
+In Foundry: **Add-on Modules → Install Module**, paste this Manifest URL and click Install:
+`https://raw.githubusercontent.com/EclipseGS27/fu-animations/main/module.json`
+
+Requires Foundry v13 and the Project FU system 4.14 or later. Enable **Fabula Ultima Battle Animations** in your world. The animations need nothing else; for sound, add the sound pack as described under [Assets not included](#assets-not-included). For the JB2A preset, also install the free **JB2A - Free Content** module.
+
 ## What plays
 - **Every class ability, spell, NPC spell and Core item in the Project FU compendium has an animation** (446 entries), picked to fit: Glacies freezes, Ignis burns, Heal glows green over your allies, Omega drops a death mark, Arcana flare up when summoned, dances, verses, therioforms, magiseeds and symbols each get their own. Passive Skills that never get used in a fight (Fortress, Dodge, Well-Traveled...) have none.
 - **Weapons and NPC basic attacks** animate from their category and damage type: swords, daggers and flails slash, heavy weapons and fists smash, spears thrust, bows fire arrows, firearms flash and shoot, thrown weapons fly, magic damage recolors the hit.
 - **Every NPC attack and spell in the bestiaries** (611: Core Rulebook, Bestiary vol. 1, Natural, High and Techno Fantasy Atlases). They match by name, so an NPC built with a book attack's name (Claw, Flamebreath, Laser Beams, Yawn...) gets its animation automatically. NPC spells that are player spells (Ignis, Glacies...) use the player animation.
-- **Custom effects** drawn in code where the sprite packs had nothing that fits: claw marks, snapping jaws, wide sweeps, ground slams, breath cones, jet streams, energy beams, an evil eye, shockwaves, sound waves, whirlwinds, downpours, falling barrages, erupting spikes, shard sprays, insect swarms, lashing tendrils, webs, binding chains, a dark vortex, billowing clouds, rapid fire, rocket salvos, sleepy Zs, dizzy stars, petal storms, a drain tether, rune circles, flying cards, a snatch, mocking laughter, a pillar of light, arcing lightning and spirit wisps. They recolor by element like the rest, and show up under "Custom" in the editor with live previews.
+- **Basic actions**: Guard raises a shield dome on the user, Study puts a question mark over the user and an alert on the target (then a light bulb), Hinder throws a curse and binds the target in chains. Change them for the world under **Actions** in the ability list.
 - **Homebrew** skills, spells and NPC attacks read their name the same way: "Acid Spit" sprays, "Savage Bite" bites, "Thunder Roar" arcs lightning. Anything the name doesn't explain falls back to its type and damage (setting to turn guesses off).
 
-## Presets: Original, Pixel VFX or JB2A
+## Presets: Original or JB2A
 Settings → **Animation preset** (GM, whole world):
-- **Original**: the sprite and pixel effects that ship with this module.
-- **Pixel VFX (drawn in code)**: every ability, spell, weapon and bestiary attack redone as pixel art drawn in code, after Sprite Fusion's open source pixel art VFX library. Needs no asset packs. See below.
-- **JB2A (free)**: every ability, spell, weapon and bestiary attack plays JB2A effects instead. Needs the free **JB2A - Free Content** module (JB2A Patreon works too). Swords, axes, maces, daggers and fists swing their JB2A weapon; bows, crossbows, guns, thrown knives, bombs and flasks fly as JB2A projectiles; Ignis throws a fire bolt into an explosion, Glacies a ray of frost, Fulgur chain lightning, breaths become JB2A breath cones, heals, shields, curses, sleep, webs, roots and summon circles use their JB2A versions, and every spell starts on a JB2A rune circle in its element's color. A handful of custom effects JB2A has nothing for (meteor showers, petal storms, steals, mocking laughter) keep their drawing.
+- **Original (pixel art drawn in code)**: every ability, spell, weapon and bestiary attack as pixel art drawn in code, after Sprite Fusion's open source pixel art VFX library. Needs no asset packs. See below.
+- **JB2A (free)**: every ability, spell, weapon and bestiary attack plays JB2A effects instead. Needs the free **JB2A - Free Content** module (JB2A Patreon works too). Swords, axes, maces, daggers and fists swing their JB2A weapon; bows, crossbows, guns, thrown knives, bombs and flasks fly as JB2A projectiles; Ignis throws a fire bolt into an explosion, Glacies a ray of frost, Fulgur chain lightning, breaths become JB2A breath cones, heals, shields, curses, sleep, webs, roots and summon circles use their JB2A versions, and every spell starts on a JB2A rune circle in its element's color. The few effects JB2A has nothing for (meteor showers, petal storms, steals, mocking laughter) play their pixel version.
 - Switching back and forth is instant and loses nothing. **Your own changes are universal**: an animation you set on an item, or for the whole world, plays the same in either preset, and the editor lists both libraries (JB2A effects under "JB2A ..." groups, JB2A bolts and beams in the Projectile list), so you can mix them freely.
 - The impact layer (freeze, shake, debris, camera, cut-ins, damage numbers) works the same on both. JB2A swings and bolts land their hit on the frame the blade or bolt reaches the target.
 - If the preset is JB2A but the JB2A module is off, the Original preset plays and the GM gets a warning.
+- Animations saved while the old sprite effects existed still play: anything that names one plays its pixel (or JB2A) counterpart.
 
-## Pixel VFX preset
-Every Original animation (the 152 sprite effects and the 34 custom drawings) has a pixel counterpart, so all 446 compendium entries and 611 bestiary attacks play in pixel art:
+## The Original preset: pixel art
+All 446 compendium entries and 611 bestiary attacks play in pixel art:
 - **From Sprite Fusion's library** (all 25 of their effects, run as they are): slashes, impacts and ricochets, muzzle flashes, blood, dashes and blinks, burning outlines, lightning strikes, chain arcs and electrified bodies, frost novas, ice spikes, crystals, shattering blocks and frozen bodies, toxic clouds, puddles and poisoned bodies, power gathering, energy beams, bolts and orbs, hex shield domes, a black hole, pillars of light and smites, healing crosses and mana drops, power-up auras, gems and coins, sparkles, and rain, snow, fog, embers, fireflies, falling leaves and bubbles.
 - **Drawn for this module in the same style**: snapping jaws, an evil eye, insect swarms, sleepy Zs, dizzy stars, laughter, music notes, symbols (alert, question, crown, arrows, skull, heart...), wisps, smoke, webs, chains, rune circles, shockwaves, sound waves, whirlwinds, breath, jets, vines, a life-drain tether, flying cards, and arrow, bullet and boulder projectiles.
 - **Combined** for bigger moves: slash combos and cross slashes, claw marks, thrusts, meteors with explosions, falling barrages, rocket salvos, shard volleys, rapid fire, attack/magic/defense up, curses and death marks.
@@ -44,6 +52,8 @@ Every Original animation (the 152 sprite effects and the 34 custom drawings) has
 - **Damage numbers**: when damage is applied, the number slams onto the token and bounces: gold and larger after a critical, with the element and the Affinity that applied under it (VULNERABLE in orange, RESISTED in grey-blue, ABSORBED as green healing), IMMUNE when nothing gets through, green for healing. A miss shows MISS as the target dodges. Several numbers on one token stack instead of overlapping. They replace the system's plain "-12 HP" text, and with Fabula Ultima Battle UI installed they replace its numbers too.
 - **Drains** (Drain Vigor, Drain Spirit, Soul Steal...) send a heal back to the user.
 - **Hover**: while a conflict runs, combatants on the scene bob gently in place. Defeated ones stay still.
+![Conditions on tokens: poisoned, dazed, shaken, slow, weak, enraged, asleep](docs/conditions.png)
+
 - **Conditions on the map**: while a token has a status, a small pixel-art loop plays on it and its sprite is tinted: poisoned bubbles (green), dazed stars circling its head, shaken trembling and a sweat drop, slow ripples at its feet (cold tint), weak sinking arrows (drained), enraged a throbbing anger mark (red), asleep floating Zs. Several tints take turns. Client setting.
 - **On the ground**: ground effects (explosions, lightning strikes, ice and rock spikes, pillars of light, puddles, rune glyphs, shield domes, scorch marks, meteor warning circles) start under the figure's feet, read from the token art, instead of halfway up its legs.
 
@@ -55,10 +65,12 @@ Every animation plays sounds from Helton Yan's Pixel Combat (317 sounds, up to t
 Sounds play on each player's Environment volume channel. Client settings: sound effects on or off, sound effect volume.
 
 ## Changing an animation
+![The effect picker: every effect as a tile, playing on hover](docs/picker.png)
+
 - **One item**: open the item sheet, header menu → **Animation**. Or right-click it in the Items directory. The choice is stored on that copy of the item, so two characters can animate the same sword differently, and everyone sees each attacker's own choice.
 - **An ability for the whole world** (GM): Settings → Ability animations → **Open the list**, search, **Edit**. Bestiary attacks are in the list too, grouped by book. Or save from an item's Animation window with "Every … in this world".
 - **A kind of weapon for the whole world** (GM): the list has a **Weapons** group with one entry per category (Swords, Daggers, Bows, Firearms, Heavy weapons, Shields...). What you set there plays for every weapon of that kind that has no animation of its own. A weapon's Animation window can also save "Every sword in this world".
-- The editor sets the style (melee, ranged, spell, support, self, none), the effect on the user, the projectile, the effect on each target, a follow-up back on the user, the color (from damage type, original, any element, or a **custom color** from a color picker: it recolors the animation in every preset, the free JB2A effects included, by turning them to that hue, saturation and lightness), the size, the **sound on use** and the **sound on hit** (Automatic, Silent, or any of the 317 sounds, with a play button), with looping previews. **Preview on the scene** plays it from your selected token at your targets, only for you. **Reset** goes back to the built-in choice.
+- The editor sets the style (melee, ranged, spell, support, self, none), the effect on the user, the projectile, the effect on each target, a follow-up back on the user (each one picked from a **grid of every effect**: search, filter by kind, hover a tile to play it, click to choose), the color (from damage type, original, any element, or a **custom color** from a color picker: it recolors the animation in every preset, the free JB2A effects included, by turning them to that hue, saturation and lightness), the size, the **sound on use** and the **sound on hit** (Automatic, Silent, or any of the 317 sounds, with a play button), with looping previews. **Preview on the scene** plays it from your selected token at your targets, only for you. **Reset** goes back to the built-in choice.
 - The **Impact** section sets the level and each part of it on its own: freeze on hit (none to very long), screen shake (none to earthquake), camera push, darkening, wind-up and afterimages (melee), debris (sparks, embers, rubble, mixed or none), the mark on the ground, and the cut-in. Every choice starts on Automatic, which shows what it does for that ability. With the cut-in on you can set its title, color and portrait (the character art by default) and preview it. **As a critical** next to Preview plays the critical version.
 - Priority: the item's own choice, then the world choice for that ability, then the world choice for that kind of weapon, then the built-in table, then the guess.
 
@@ -67,17 +79,15 @@ Client (each player for themselves): play animations, hover during conflicts, ho
 World: melee attacks dash to the target, animate homebrew abilities, the ability list.
 
 ## Credits
-- Super Pixel Effects Gigapack - Will Tice / unTied Games
-- 2D VFX Pack - Casting and Buffs, 2D VFX Pack - Slashes and Impacts - MagusVFX
 - Pixel Combat sound effects - Helton Yan
 - JB2A preset: plays effects from JB2A - Jules and Ben's Animated Assets (not included; install their module)
-- Pixel VFX preset: Sprite Fusion's open source pixel art VFX (https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez. Included in `scripts/sf/` (converted to JavaScript), with the license next to them.
+- Original preset: breath, jet stream, whirlwind, spirit wisps and smoke puff from pixelfx (https://github.com/patch-gg/pixelfx), MIT License, Copyright (c) 2026 Patch and Hugo Duprez. Included in `scripts/pfx/` with the license next to it.
+- Original preset: Sprite Fusion's open source pixel art VFX (https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez. Included in `scripts/sf/` (converted to JavaScript), with the license next to them.
 
-These packs forbid redistributing their files. Keep this module private while the vfx and sfx folders are inside it.
+The sound pack forbids redistributing its files. Keep this module private while the sfx folder is inside it.
 
 ## Assets not included
-This repository holds the code only. The sprite effects and sounds are paid packs whose licenses don't allow redistribution. To run the module, buy them and place them as:
-- `vfx/pixel/` and `vfx/magus/`: Super Pixel Effects Gigapack (unTied Games) and the MagusVFX 2D VFX packs, as PNG sprite sheets with the file names listed in `scripts/library.mjs`
+This repository holds the code only. The sounds are a paid pack whose license doesn't allow redistribution. To run the module with sound, buy it and place it as:
 - `sfx/`: Helton Yan's Pixel Combat sounds as `.ogg`, with the file names listed in `scripts/sounds.mjs`
 
-The JB2A preset needs only the free "JB2A - Free Content" Foundry module. The Pixel VFX preset needs nothing: it is all code (sounds still come from `sfx/`).
+The animations need nothing else: the Original preset is all code, and the JB2A preset needs only the free "JB2A - Free Content" Foundry module.

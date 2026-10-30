@@ -1,4 +1,3 @@
-import { PROC } from './procedural.mjs';
 
 /**
  * Name-reading rules for NPC attacks and abilities that are not in any table (homebrew, renamed or new book content):
@@ -8,7 +7,8 @@ import { PROC } from './procedural.mjs';
 const ELEMENT_HIT = { physical: 'px-impact-sym-1', fire: 'px-explosion-sym-1', ice: 'px-impact-sym-2', bolt: 'pr-chain-lightning', air: 'pr-tornado', earth: 'pr-spikes', light: 'px-light-burst', dark: 'pr-void', poison: 'pr-cloud', '': 'px-impact-sym-1' };
 const SLASHES = ['slash-down-circ-2', 'slash-up-arch-2', 'slash-down-2', 'slash-up-circ-2', 'slash-down-red-2'];
 const SMASH = ['px-impact-sym-3', 'px-impact-sym-1', 'px-impact-sym-4'];
-const FROM = new Set(Object.entries(PROC).filter(([, p]) => p.needsFrom).map(([id]) => id));
+/** effects that travel from the user to the target */
+const FROM = new Set(['pr-breath', 'pr-jet', 'pr-beam', 'pr-soundwave', 'pr-shards', 'pr-vines', 'pr-volley', 'pr-missiles', 'pr-tether', 'pr-cards', 'pr-steal', 'pr-chain-lightning']);
 
 function pick(list, seed) {
 	let h = 0;

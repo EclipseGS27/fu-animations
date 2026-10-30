@@ -19,7 +19,7 @@ Hooks.once('init', () => {
 	const reg = (key, data) => game.settings.register(MODULE_ID, key, { config: true, ...data });
 	reg('preset', {
 		name: 'Animation preset',
-		hint: 'Original: the sprite and pixel effects that come with this module. Pixel VFX: every ability, spell and bestiary attack redone as pixel art drawn in code (Sprite Fusion\'s open source effects and more in their style), recolored by element; needs no asset packs. JB2A: every ability, spell and bestiary attack uses JB2A effects instead (needs the free "JB2A - Free Content" module or JB2A Patreon). Animations you changed yourself, on an item or for the world, stay the same in every preset.',
+		hint: 'Original: every ability, spell, weapon and bestiary attack as pixel art drawn in code (Sprite Fusion\'s open source effects and more in their style), recolored by element; needs no asset packs. JB2A: every one uses JB2A effects instead (needs the free "JB2A - Free Content" module or JB2A Patreon). Animations you changed yourself, on an item or for the world, stay the same in every preset.',
 		scope: 'world',
 		type: String,
 		choices: PRESETS,

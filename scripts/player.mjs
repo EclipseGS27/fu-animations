@@ -1,15 +1,13 @@
-import { ELEMENT_LOOK, FX, MODULE_ID, getSetting } from './presets.mjs';
-import { PROC, isProc } from './procedural.mjs';
+import { ELEMENT_LOOK, getSetting } from './presets.mjs';
 import { now, wait } from './clock.mjs';
 import { isJb, jbDuration, playJb, preloadJb } from './jb2a.mjs';
 import { isPixel, pixelDuration, playPixel } from './pixel.mjs';
 
 /**
- * Canvas side: sprite effects, projectiles, and visual-only token motion (lunges, knockback, dodges, idle hover).
+ * Canvas side: playing effects (pixel art or JB2A) and visual-only token motion (lunges, knockback, dodges, idle hover).
  * Nothing here writes to documents; every client plays the same plan on its own canvas.
  */
 
-const ROOT = `modules/${MODULE_ID}/vfx/`;
 const ease = {
 	linear: (t) => t,
 	in: (t) => t * t,
@@ -18,41 +16,9 @@ const ease = {
 	back: (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2),
 };
 
-/* ------------------------------------------------------------------ */
-/*  Textures                                                           */
-/* ------------------------------------------------------------------ */
-
-const frameCache = new Map();
-
-async function loadTex(src) {
-	const load = foundry.canvas?.loadTexture ?? globalThis.loadTexture;
-	return load(src);
-}
-
-/** All frames of an effect sheet, cut once and cached */
-export function framesOf(id) {
-	if (frameCache.has(id)) return frameCache.get(id);
-	const fx = FX[id];
-	if (!fx) return Promise.resolve(null);
-	const p = loadTex(ROOT + fx.src).then((tex) => {
-		if (!tex) return null;
-		const base = tex.baseTexture;
-		if (fx.pixel) base.scaleMode = PIXI.SCALE_MODES.NEAREST;
-		const out = [];
-		for (let i = 0; i < fx.frames; i++) {
-			const c = i % fx.cols;
-			const r = Math.floor(i / fx.cols);
-			out.push(new PIXI.Texture(base, new PIXI.Rectangle(c * fx.fw, r * fx.fh, fx.fw, fx.fh)));
-		}
-		return out;
-	});
-	frameCache.set(id, p);
-	return p;
-}
-
+/** Get JB2A videos ready before a move starts (pixel effects need nothing) */
 export function preload(ids) {
-	const list = [...new Set(ids.filter(Boolean))];
-	return Promise.all([...list.filter((id) => FX[id] && !isProc(id)).map(framesOf), preloadJb(list.filter(isJb))]);
+	return preloadJb([...new Set(ids.filter(Boolean))].filter(isJb));
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,224 +69,20 @@ export function userScale() {
 }
 
 /**
- * Play one effect sheet at a point.
+ * Play one effect at a point: a pixel effect, or a JB2A video.
  * @param {string} id effect id
  * @param {{x:number,y:number,rotation?:number,scale?:number,element?:string,alpha?:number,flip?:boolean,tokenSize?:number}} at
  * @returns {Promise<void>} resolves when the effect ends
  */
 export async function playFx(id, at) {
-	if (isProc(id)) return playProc(id, at);
 	if (isJb(id)) return playJb(id, at);
 	if (isPixel(id)) return playPixel(id, at);
-	const fx = FX[id];
-	if (!fx || !canvas?.ready) return;
-	const frames = await framesOf(id);
-	if (!frames?.length) return;
-	const sprite = new PIXI.AnimatedSprite(frames);
-	sprite.anchor.set(0.5);
-	sprite.position.set(at.x, at.y);
-	const px = canvas.grid.size * fx.size * (at.scale ?? 1) * userScale() * Math.max(1, (at.tokenSize ?? 1) * 0.85);
-	const s = px / fx.fw;
-	sprite.scale.set(at.flip ? -s : s, s);
-	if (fx.dir && at.rotation != null) sprite.rotation = at.rotation;
-	sprite.alpha = at.alpha ?? 1;
-	if (fx.blend === 'add') sprite.blendMode = PIXI.BLEND_MODES.ADD;
-	applyElement(sprite, fx, at.element);
-	sprite.loop = false;
-	sprite.autoUpdate = false;
-	sprite.animationSpeed = fx.fps / 60;
-	getLayer().addChild(sprite);
-	const loops = fx.loop ? 2 : 1;
-	return new Promise((resolve) => {
-		let played = 0;
-		const tick = (delta) => {
-			if (sprite.destroyed) return finish();
-			sprite.update(delta);
-		};
-		const finish = () => {
-			canvas.app.ticker.remove(tick);
-			if (!sprite.destroyed) {
-				sprite.parent?.removeChild(sprite);
-				sprite.destroy({ children: true, texture: false, baseTexture: false });
-			}
-			resolve();
-		};
-		sprite.onComplete = () => {
-			played++;
-			if (played < loops) {
-				sprite.gotoAndPlay(0);
-				return;
-			}
-			// short fade so effects don't pop out
-			const start = now();
-			const fade = () => {
-				const t = (now() - start) / 140;
-				if (sprite.destroyed || t >= 1) {
-					canvas.app.ticker.remove(fade);
-					return finish();
-				}
-				sprite.alpha = (at.alpha ?? 1) * (1 - t);
-			};
-			canvas.app.ticker.add(fade);
-		};
-		canvas.app.ticker.add(tick);
-		sprite.play();
-		// safety net
-		setTimeout(finish, (fx.frames / fx.fps) * 1000 * loops + 2500);
-	});
-}
-
-/** Run a code-drawn effect on the scene */
-export function playProc(id, at) {
-	const def = PROC[id];
-	if (!def || !canvas?.ready) return Promise.resolve();
-	const root = getLayer();
-	const box = new PIXI.Container();
-	root.addChild(box);
-	const look = ELEMENT_LOOK[at.element];
-	const point = { x: at.x, y: at.y };
-	const ctx = {
-		g: canvas.grid.size * (at.scale ?? 1) * userScale() * Math.max(1, (at.tokenSize ?? 1) * 0.85),
-		x: at.x,
-		y: at.y,
-		from: at.from ?? point,
-		to: at.to ?? point,
-		color: at.element && at.element !== 'none' && look ? look.color : def.color,
-		add: (o) => {
-			if (at.alpha != null) o.alpha = at.alpha;
-			box.addChild(o);
-		},
-		tick: (fn) => canvas.app.ticker.add(fn),
-		untick: (fn) => canvas.app.ticker.remove(fn),
-	};
-	return def.run(ctx).finally(() => {
-		if (!box.destroyed) box.destroy({ children: true });
-	});
 }
 
 export function fxDuration(id) {
-	if (isProc(id)) return PROC[id].dur;
 	if (isJb(id)) return jbDuration(id);
 	if (isPixel(id)) return pixelDuration(id);
-	const fx = FX[id];
-	return fx ? (fx.frames / fx.fps) * 1000 * (fx.loop ? 2 : 1) : 0;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Projectiles                                                        */
-/* ------------------------------------------------------------------ */
-
-function colorFor(element) {
-	return (ELEMENT_LOOK[element] ?? ELEMENT_LOOK.none).color;
-}
-
-/**
- * Draw something flying from one point to another.
- * @returns {Promise<void>} resolves on arrival
- */
-export function projectile(kind, from, to, element = 'none') {
-	if (!kind || !canvas?.ready) return Promise.resolve();
-	const g = canvas.grid.size;
-	const color = colorFor(element);
-	const dx = to.x - from.x;
-	const dy = to.y - from.y;
-	const dist = Math.hypot(dx, dy) || 1;
-	const angle = Math.atan2(dy, dx);
-	const root = getLayer();
-	const obj = new PIXI.Container();
-	root.addChild(obj);
-	const gr = new PIXI.Graphics();
-	obj.addChild(gr);
-	const trail = [];
-	let speed = 900; // px per second at grid 100
-	if (kind === 'beam') {
-		const ms = 160;
-		const hold = 220;
-		const start = now();
-		return new Promise((resolve) => {
-			const tick = () => {
-				const t = (now() - start) / ms;
-				const k = Math.min(1, t);
-				const fadeT = Math.max(0, (now() - start - ms - hold) / 160);
-				gr.clear();
-				const ex = from.x + dx * k;
-				const ey = from.y + dy * k;
-				gr.blendMode = PIXI.BLEND_MODES.ADD;
-				gr.lineStyle(g * 0.22, color, 0.35 * (1 - fadeT)).moveTo(from.x, from.y).lineTo(ex, ey);
-				gr.lineStyle(g * 0.08, 0xffffff, 0.9 * (1 - fadeT)).moveTo(from.x, from.y).lineTo(ex, ey);
-				if (fadeT >= 1) {
-					canvas.app.ticker.remove(tick);
-					obj.destroy({ children: true });
-				}
-			};
-			canvas.app.ticker.add(tick);
-			setTimeout(resolve, ms);
-		});
-	}
-	if (kind === 'bullet') speed = 2600;
-	if (kind === 'arrow') speed = 1500;
-	if (kind === 'rock') speed = 700;
-	const ms = Math.max(140, (dist / (speed * (g / 100))) * 1000);
-	const arc = kind === 'rock' ? Math.min(dist * 0.35, g * 2) : kind === 'orb' ? Math.min(dist * 0.08, g * 0.4) : 0;
-	const start = now();
-	const drawHead = () => {
-		gr.clear();
-		if (kind === 'arrow') {
-			gr.lineStyle(Math.max(2, g * 0.03), 0xe8dcc0, 1).moveTo(-g * 0.28, 0).lineTo(g * 0.12, 0);
-			gr.beginFill(color === ELEMENT_LOOK.none.color ? 0xd9d9d9 : color).drawPolygon([g * 0.18, 0, g * 0.08, -g * 0.05, g * 0.08, g * 0.05]).endFill();
-		} else if (kind === 'bullet') {
-			gr.blendMode = PIXI.BLEND_MODES.ADD;
-			gr.lineStyle(g * 0.04, 0xfff3c4, 1).moveTo(-g * 0.22, 0).lineTo(0, 0);
-		} else if (kind === 'rock') {
-			gr.beginFill(0x7a6248).drawCircle(0, 0, g * 0.16).endFill();
-			gr.beginFill(0x9c8160).drawCircle(-g * 0.04, -g * 0.04, g * 0.08).endFill();
-		} else {
-			gr.blendMode = PIXI.BLEND_MODES.ADD;
-			gr.beginFill(color, 0.35).drawCircle(0, 0, g * 0.16).endFill();
-			gr.beginFill(color, 0.8).drawCircle(0, 0, g * 0.09).endFill();
-			gr.beginFill(0xffffff, 0.95).drawCircle(0, 0, g * 0.045).endFill();
-		}
-	};
-	drawHead();
-	obj.rotation = kind === 'rock' || kind === 'orb' ? 0 : angle;
-	return new Promise((resolve) => {
-		const tick = () => {
-			const t = Math.min(1, (now() - start) / ms);
-			const x = from.x + dx * t;
-			const y = from.y + dy * t - Math.sin(Math.PI * t) * arc;
-			obj.position.set(x, y);
-			if (kind === 'rock') obj.rotation += 0.15;
-			if (kind === 'orb' || kind === 'rock') {
-				const p = new PIXI.Graphics();
-				p.blendMode = kind === 'orb' ? PIXI.BLEND_MODES.ADD : PIXI.BLEND_MODES.NORMAL;
-				p.beginFill(kind === 'orb' ? color : 0x8a7055, 0.6).drawCircle(0, 0, g * (kind === 'orb' ? 0.07 : 0.05)).endFill();
-				p.position.set(x, y);
-				root.addChild(p);
-				trail.push({ p, born: now() });
-			}
-			for (let i = trail.length - 1; i >= 0; i--) {
-				const age = (now() - trail[i].born) / 260;
-				if (age >= 1) {
-					trail[i].p.destroy();
-					trail.splice(i, 1);
-				} else {
-					trail[i].p.alpha = 0.6 * (1 - age);
-					trail[i].p.scale.set(1 - age * 0.6);
-				}
-			}
-			if (t >= 1) {
-				canvas.app.ticker.remove(tick);
-				obj.destroy({ children: true });
-				const cleanup = () => {
-					for (const tr of trail) tr.p.destroy();
-					trail.length = 0;
-				};
-				setTimeout(cleanup, 260);
-				resolve();
-			}
-		};
-		canvas.app.ticker.add(tick);
-	});
+	return 0;
 }
 
 /* ------------------------------------------------------------------ */
