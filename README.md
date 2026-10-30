@@ -70,11 +70,10 @@ World: melee attacks dash to the target, animate homebrew abilities, the ability
 - JB2A preset: plays effects from JB2A - Jules and Ben's Animated Assets (not included; install their module)
 - Pixel VFX preset: Sprite Fusion's open source pixel art VFX (https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez. Included in `scripts/sf/` (converted to JavaScript), with the license next to them.
 
-These packs forbid redistributing their files. Keep this module private while the vfx and sfx folders are inside it.
+The Pixel Combat sounds are included in `sfx/` with Helton Yan's permission for this module. The sprite packs forbid redistributing their files: keep this module private while the vfx folder is inside it.
 
-## Assets not included
-This repository holds the code only. The sprite effects and sounds are paid packs whose licenses don't allow redistribution. To run the module, buy them and place them as:
+## Assets
+The sounds are included: `sfx/` holds Helton Yan's Pixel Combat sounds (950 `.ogg` files), used with permission. The sprite effects for the Original preset are paid packs whose licenses don't allow redistribution. To use that preset, buy them and place them as:
 - `vfx/pixel/` and `vfx/magus/`: Super Pixel Effects Gigapack (unTied Games) and the MagusVFX 2D VFX packs, as PNG sprite sheets with the file names listed in `scripts/library.mjs`
-- `sfx/`: Helton Yan's Pixel Combat sounds as `.ogg`, with the file names listed in `scripts/sounds.mjs`
 
-The JB2A preset needs only the free "JB2A - Free Content" Foundry module. The Pixel VFX preset needs nothing: it is all code (sounds still come from `sfx/`).
+The JB2A preset needs only the free "JB2A - Free Content" Foundry module. The Pixel VFX preset needs nothing else: it is all code, and the sounds ship with the module.
