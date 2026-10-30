@@ -1,0 +1,40 @@
+{
+  "id": "fu-animations",
+  "title": "Fabula Ultima Battle Animations",
+  "description": "Animations for every Project FU class ability, spell, weapon attack and Core item, and every NPC attack and spell in the Core Rulebook, Bestiary vol. 1 and the three Atlases, with 34 custom effects drawn in code for what the sprite packs don't cover. Melee attackers dash to their target and back, spells fly and burst on whoever is targeted, combatants hover while they wait. Sound effects play with each animation. Every animation and sound can be changed per item or for the whole world.",
+  "version": "1.4.0",
+  "authors": [
+    {
+      "name": "George Sowidan"
+    }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "projectfu",
+        "type": "system",
+        "compatibility": {
+          "minimum": "4.14.0"
+        }
+      }
+    ],
+    "recommends": [
+      {
+        "id": "JB2A_DnD5e",
+        "type": "module",
+        "reason": "Needed for the JB2A animation preset (free)."
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.mjs"
+  ],
+  "styles": [
+    "styles/anim.css"
+  ],
+  "socket": true
+}
