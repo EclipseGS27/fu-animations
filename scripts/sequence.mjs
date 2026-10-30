@@ -1,6 +1,6 @@
-import { FX, MODULE_ID, activePreset, getSetting, itemDamageType, resolveSpec } from './presets.mjs';
+import { MODULE_ID, activePreset, getSetting, itemDamageType, resolveSpec } from './presets.mjs';
 import { playSound, soundsFor } from './audio.mjs';
-import { center, dodge, ease, fxDuration, knockback, lunge, playFx, preload, projectile, tweenOffset, wait } from './player.mjs';
+import { center, dodge, ease, fxDuration, knockback, lunge, playFx, preload, tweenOffset, wait } from './player.mjs';
 import { hitstop } from './clock.mjs';
 import { feelOf } from './feel.mjs';
 import * as I from './impact.mjs';
@@ -102,13 +102,8 @@ const angleTo = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
 const sizeOf = (token) => Math.max(token?.document?.width ?? 1, token?.document?.height ?? 1);
 const hex = (n) => `#${Number(n).toString(16).padStart(6, '0')}`;
 
-/** Darker shade of a color, for the outer glow of projectiles */
-function shade(color, k = 0.55) {
-	const r = ((color >> 16) & 255) * k;
-	const g = ((color >> 8) & 255) * k;
-	const b = (color & 255) * k;
-	return (r << 16) | (g << 8) | b;
-}
+/** The critical-hit flash in the JB2A preset */
+const JB_CRIT = 'jb-impact-013';
 
 /** tokenId -> what last hit it, so damage numbers know crits and elements */
 export const recentHits = new Map();
@@ -200,7 +195,7 @@ async function strike(plan, F, src, t, first) {
 				else playSound(snd.hit);
 				if (crit) playSound(snd.crit);
 			}
-			if (crit) playFx(activePreset() === 'pixel' ? PIXEL_CRIT : 'impact-flash-3', { x: b.x, y: b.y, from: a, to: b, rotation: at.rotation, scale: 1.2, element: 'none', tokenSize: at.tokenSize, token });
+			if (crit) playFx(activePreset() === 'jb2a' ? JB_CRIT : PIXEL_CRIT, { x: b.x, y: b.y, from: a, to: b, rotation: at.rotation, scale: 1.2, element: 'none', tokenSize: at.tokenSize, token });
 			return land(plan, F, src, token, at, { crit, miss, ux, uy, first });
 		}),
 	);
@@ -217,19 +212,7 @@ function fly(plan, F, kind, from, to, i, toToken = null) {
 		if (kind === 'sf-meteor') I.telegraph(floor, { color, size: 1.2 * F.ring, ms: 900 });
 		return playPixel(kind, { x: to.x, y: to.y, from, to, element: plan.element, scale: plan.spec.scale && plan.spec.scale > 1 ? 1.15 : 1 }).hit;
 	}
-	if (kind === 'orb') {
-		const dist = Math.hypot(to.x - from.x, to.y - from.y);
-		const g = canvas.grid.size;
-		const ms = Math.max(260, Math.min(650, (dist / (9 * g)) * 1000 * 1.1));
-		return I.blazingProjectile(from, to, { color, glow: shade(color), size: F.orb, ms, arc: i % 2 ? 0.7 : -0.7, embers: F.level === 'light' ? 1 : F.level === 'normal' ? 2 : 4 });
-	}
-	if (kind === 'meteor') {
-		const g = canvas.grid.size;
-		const start = { x: to.x - g * 2.6, y: to.y - g * 4.2 };
-		I.telegraph(floor, { color, size: 1.2 * F.ring, ms: 820 });
-		return wait(220).then(() => I.blazingProjectile(start, to, { color, glow: shade(color, 0.6), size: Math.max(0.6, F.orb * 1.8), ms: 600, fall: 1.5, embers: 6 }));
-	}
-	return projectile(kind, from, to, plan.element);
+	return Promise.resolve();
 }
 
 /** Melee approach: wind-up, dash with or without afterimages. Returns how to go back */
@@ -267,7 +250,7 @@ export async function runPlan(plan) {
 	const { spec } = plan;
 	const src = canvas.tokens.get(plan.source) ?? null;
 	const targets = (plan.targets ?? []).map((t) => ({ token: canvas.tokens.get(t.id), result: t.result })).filter((t) => t.token);
-	await preload([spec.cast, spec.hit, spec.after, isJb(spec.projectile) ? spec.projectile : null, plan.crit && activePreset() !== 'pixel' ? 'impact-flash-3' : null].filter(Boolean));
+	await preload([spec.cast, spec.hit, spec.after, isJb(spec.projectile) ? spec.projectile : null, plan.crit && activePreset() === 'jb2a' ? JB_CRIT : null].filter(Boolean));
 	const snd = (plan._snd = soundsFor(spec, plan.element));
 	plan._heard = false;
 	plan._camera = false;
@@ -334,7 +317,7 @@ async function perform(plan, F, src, targets, snd) {
 			from: c,
 			to: first ? center(first) : c,
 			rotation: first && first !== src ? angleTo(c, center(first)) : null,
-			element: FX[spec.cast]?.cat === 'Healing' ? 'none' : plan.element,
+			element: plan.element,
 			scale: F.level === 'heroic' ? 1.3 : 1,
 			tokenSize: sizeOf(src),
 			token: src,

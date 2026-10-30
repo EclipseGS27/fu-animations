@@ -1,14 +1,12 @@
-import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, FX, MODULE_ID, PRESETS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
+import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, MODULE_ID, PRESETS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
 import { JBFX, isJb, jbModule } from './jbcore.mjs';
 import { resolveElement, runPlan } from './sequence.mjs';
-import { PROC, isProc } from './procedural.mjs';
 import { autoSounds, playSound, soundGroups, soundLabel } from './audio.mjs';
 import { IMPACT_FIELDS, autoText, feelOf } from './feel.mjs';
 import { cutIn } from './impact.mjs';
 import { PIXEL, PixelPreview, isPixel } from './pixel.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
-const ROOT = `modules/${MODULE_ID}/vfx/`;
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
@@ -41,16 +39,6 @@ const opts = (map, selected) => Object.entries(map).map(([k, l]) => `<option val
 /*  Small looping preview of one effect, drawn on a 2D canvas          */
 /* ------------------------------------------------------------------ */
 
-const images = new Map();
-function image(src) {
-	if (!images.has(src)) {
-		const img = new Image();
-		img.src = src;
-		images.set(src, img);
-	}
-	return images.get(src);
-}
-
 function cssFilter(fx, element) {
 	const look = ELEMENT_LOOK[element];
 	if (!look || element === 'none' || !fx) return 'none';
@@ -76,63 +64,14 @@ class Preview {
 		if (id !== this.id) this.start = performance.now();
 		this.id = id;
 		this.element = element;
-		this.el.style.filter = isProc(id) ? 'none' : isPixel(id) ? (PIXEL[id].ramp ? 'none' : cssFilter(PIXEL[id], element)) : cssFilter(FX[id] ?? JBFX[id], element);
+		this.el.style.filter = isPixel(id) ? (PIXEL[id].ramp ? 'none' : cssFilter(PIXEL[id], element)) : cssFilter(JBFX[id], element);
 		if (isPixel(id)) {
 			this.pixel ??= new PixelPreview(this.el);
 			this.pixel.set(id, element);
 		}
 		this.#video(id);
-		if (isProc(id)) this.#startProc();
-		else this.#stopProc();
 	}
 
-	/** Code-drawn effects preview in a tiny PIXI stage of their own */
-	#startProc() {
-		if (!this.app) {
-			try {
-				this.app = new PIXI.Application({ width: this.el.width, height: this.el.height, backgroundAlpha: 0, antialias: true });
-			} catch {
-				return;
-			}
-			this.app.view.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
-			this.el.parentElement.style.position = 'relative';
-			this.el.parentElement.append(this.app.view);
-		}
-		this.app.view.style.display = '';
-		this.el.style.visibility = 'hidden';
-		this.#loop();
-	}
-
-	#stopProc() {
-		if (this.app) this.app.view.style.display = 'none';
-		this.el.style.visibility = '';
-		this.procRun = (this.procRun ?? 0) + 1;
-	}
-
-	async #loop() {
-		const run = (this.procRun = (this.procRun ?? 0) + 1);
-		while (run === this.procRun && this.app && !this.stopped) {
-			const def = PROC[this.id];
-			if (!def) return;
-			const W = this.el.width;
-			const box = new PIXI.Container();
-			this.app.stage.addChild(box);
-			const look = ELEMENT_LOOK[this.element];
-			await def.run({
-				g: W * 0.3,
-				x: W * 0.62,
-				y: W * 0.52,
-				from: { x: W * 0.15, y: W * 0.72 },
-				to: { x: W * 0.62, y: W * 0.52 },
-				color: this.element && this.element !== 'none' && look ? look.color : def.color,
-				add: (o) => box.addChild(o),
-				tick: (fn) => this.app.ticker.add(fn),
-				untick: (fn) => this.app.ticker.remove(fn),
-			});
-			box.destroy({ children: true });
-			await new Promise((r) => setTimeout(r, 350));
-		}
-	}
 	/** JB2A effects preview from their video */
 	#video(id) {
 		const fx = JBFX[id];
@@ -180,21 +119,6 @@ class Preview {
 			ctx.drawImage(vd, (el.width - w) / 2, (el.height - h) / 2, w, h);
 			return;
 		}
-		const fx = FX[this.id];
-		if (!fx) return;
-		const img = image(ROOT + fx.src);
-		if (!img.complete || !img.naturalWidth) return;
-		const dur = (fx.frames / fx.fps) * 1000 + 500;
-		const t = (performance.now() - this.start) % dur;
-		const i = Math.min(fx.frames - 1, Math.floor((t / 1000) * fx.fps));
-		const c = i % fx.cols;
-		const r = Math.floor(i / fx.cols);
-		ctx.imageSmoothingEnabled = !fx.pixel;
-		ctx.globalCompositeOperation = fx.blend === 'add' ? 'lighter' : 'source-over';
-		const s = Math.min(el.width / fx.fw, el.height / fx.fh) * (fx.pixel ? 0.95 : 1.15);
-		const w = fx.fw * s;
-		const h = fx.fh * s;
-		ctx.drawImage(img, c * fx.fw, r * fx.fh, fx.fw, fx.fh, (el.width - w) / 2, (el.height - h) / 2, w, h);
 	};
 	stop() {
 		this.stopped = true;
@@ -204,9 +128,6 @@ class Preview {
 			this.vid = null;
 		}
 		cancelAnimationFrame(this.raf);
-		this.procRun = (this.procRun ?? 0) + 1;
-		this.app?.destroy(true, { children: true });
-		this.app = null;
 	}
 }
 
@@ -469,8 +390,7 @@ export class AnimationEditor extends ApplicationV2 {
 		const el = this.previewElement;
 		for (const p of this.previews) {
 			const id = this.spec[p.key];
-			const healing = FX[id]?.cat === 'Healing';
-			p.set(id, p.key === 'after' ? (this.spec.afterElement ?? 'none') : healing && p.key === 'cast' ? 'none' : el);
+			p.set(id, p.key === 'after' ? (this.spec.afterElement ?? 'none') : el);
 		}
 	}
 

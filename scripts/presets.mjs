@@ -1,7 +1,5 @@
 import { ABILITIES } from './abilities.mjs';
 import { BESTIARY } from './bestiary.mjs';
-import { FX } from './library.mjs';
-import { PROC } from './procedural.mjs';
 import { specFromName } from './keywords.mjs';
 import { JBFX, jbAvailable } from './jbcore.mjs';
 import { toJb } from './jbmap.mjs';
@@ -19,15 +17,13 @@ export const STYLES = {
 	none: 'No animation',
 };
 
-export const PROJECTILES = { '': 'None', orb: 'Magic orb', arrow: 'Arrow', bullet: 'Bullet', beam: 'Beam', rock: 'Boulder', meteor: 'Meteor from the sky' };
+export const PROJECTILES = { '': 'None' };
 
-export const PRESETS = { original: 'Original', pixel: 'Pixel VFX (drawn in code)', jb2a: 'JB2A (free)' };
+export const PRESETS = { original: 'Original (pixel art drawn in code)', jb2a: 'JB2A (free)' };
 
-/** The preset in use: JB2A only when the world chose it and the JB2A module is on */
+/** The preset in use: JB2A only when the world chose it and the JB2A module is on, else the pixel art ('pixel') */
 export function activePreset() {
-	const p = getSetting('preset');
-	if (p === 'pixel') return 'pixel';
-	return p === 'jb2a' && jbAvailable() ? 'jb2a' : 'original';
+	return getSetting('preset') === 'jb2a' && jbAvailable() ? 'jb2a' : 'pixel';
 }
 
 export const ELEMENTS = {
@@ -307,24 +303,39 @@ export function worldOverrides() {
  */
 export function resolveSpec(item, ctx = {}) {
 	const own = item?.getFlag?.(MODULE_ID, 'spec');
-	if (own?.style) return { spec: own, source: 'item' };
+	if (own?.style) return { spec: current(own, item, ctx), source: 'item' };
 	const key = abilityKey(item);
 	const world = key ? worldOverrides()[key] : null;
-	if (world?.style) return { spec: world, source: 'world' };
+	if (world?.style) return { spec: current(world, item, ctx), source: 'world' };
 	const wk = weaponKey(item);
 	const kind = wk ? worldOverrides()[wk] : null;
-	if (kind?.style) return { spec: kind, source: 'category' };
+	if (kind?.style) return { spec: current(kind, item, ctx), source: 'category' };
 	const def = presetFor(key, { item, damageType: ctx.damageType });
 	if (def) return { spec: def, source: 'default' };
 	return { spec: inPreset(fallbackSpec(item, ctx), { item, damageType: ctx.damageType }), source: 'guess' };
 }
 
-/** An original animation as the active preset plays it */
+/** An effect id from the built-in recipes rather than a pixel or JB2A effect */
+const isRecipeId = (id) => typeof id === 'string' && !!id && !id.startsWith('sf-') && !id.startsWith('jb-');
+const FIELDS = ['cast', 'hit', 'after', 'projectile'];
+
+/**
+ * A built-in recipe as the active preset plays it. The recipes name effects by role ("slash-down-2",
+ * "cast-glow-3", "pr-breath"); each preset turns them into its own effects. The few JB2A has nothing for play
+ * their pixel version.
+ */
 export function inPreset(spec, ctx = {}) {
-	const p = activePreset();
-	if (p === 'jb2a') return toJb(spec, ctx);
-	if (p === 'pixel') return toPixel(spec, ctx);
-	return spec;
+	if (activePreset() !== 'jb2a') return toPixel(spec, ctx);
+	const out = toJb(spec, ctx);
+	if (!out || !FIELDS.some((f) => isRecipeId(out[f]))) return out;
+	const px = toPixel(spec, { ...ctx, key: undefined });
+	for (const f of FIELDS) if (isRecipeId(out[f])) out[f] = px?.[f] ?? null;
+	return out;
+}
+
+/** Animations saved before the old sprite effects were removed: translate whatever still names one */
+function current(spec, item, ctx = {}) {
+	return FIELDS.some((f) => isRecipeId(spec[f])) ? inPreset(spec, { item, damageType: ctx.damageType }) : spec;
 }
 
 /** The built-in animation for a table key in the active preset */
@@ -342,7 +353,7 @@ export function defaultSpec(item, ctx = {}) {
 }
 
 export function fxLabel(id) {
-	return id ? (FX[id]?.label ?? PROC[id]?.label ?? PIXEL[id]?.label ?? JBFX[id]?.label ?? id) : '';
+	return id ? (PIXEL[id]?.label ?? JBFX[id]?.label ?? id) : '';
 }
 
 export function describe(spec) {
@@ -362,18 +373,11 @@ export function describe(spec) {
 
 /** Effect ids grouped for <select> menus */
 export function fxGroups() {
-	const groups = {};
-	for (const [id, f] of Object.entries(FX)) (groups[f.cat] ??= []).push([id, f.label]);
-	groups.Custom = Object.entries(PROC).map(([id, p]) => [id, p.label]);
-	for (const g of Object.values(groups)) g.sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
-	const out = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
 	// pixel effects are drawn in code, so they can be picked in any preset
 	const px = {};
 	for (const [id, f] of Object.entries(PIXEL)) (px[f.cat] ??= []).push([id, f.label]);
 	for (const g of Object.values(px)) g.sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
-	const pxGroups = Object.entries(px).sort((a, b) => a[0].localeCompare(b[0]));
-	if (activePreset() === 'pixel') out.unshift(...pxGroups);
-	else out.push(...pxGroups);
+	const out = Object.entries(px).sort((a, b) => a[0].localeCompare(b[0]));
 	// JB2A effects can be picked in any preset, when the module is installed
 	if (jbAvailable()) {
 		const jb = {};
@@ -386,7 +390,7 @@ export function fxGroups() {
 
 /** Projectile choices: the drawn ones, plus every JB2A bolt, beam and thrown weapon */
 export function projectileGroups() {
-	const groups = [['Drawn', Object.entries(PROJECTILES).filter(([k]) => k)], ['Pixel', [...PIXEL_PROJECTILES].sort((a, b) => a[1].localeCompare(b[1]))]];
+	const groups = [['Pixel', [...PIXEL_PROJECTILES].sort((a, b) => a[1].localeCompare(b[1]))]];
 	if (jbAvailable()) {
 		const jb = {};
 		for (const [id, f] of Object.entries(JBFX)) if (f.mode === 'stretch') (jb[f.cat] ??= []).push([id, f.label]);
@@ -395,4 +399,4 @@ export function projectileGroups() {
 	return groups;
 }
 
-export { ABILITIES, BESTIARY, FX };
+export { ABILITIES, BESTIARY };
