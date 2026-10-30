@@ -1,4 +1,4 @@
-import { MODULE_ID, activePreset, getSetting, itemDamageType, resolveSpec } from './presets.mjs';
+import { ACTIONS, MODULE_ID, actionSpec, activePreset, getSetting, itemDamageType, resolveSpec } from './presets.mjs';
 import { playSound, soundsFor } from './audio.mjs';
 import { center, dodge, ease, fxDuration, knockback, lunge, playFx, preload, tweenOffset, wait } from './player.mjs';
 import { hitstop } from './clock.mjs';
@@ -53,6 +53,8 @@ export function planFromMessage(msg) {
 	if (!canvas?.ready) return null;
 	const check = msg.getFlag?.('projectfu', 'Check');
 	const itemUuid = check?.itemUuid ?? msg.getFlag?.('projectfu', 'Item');
+	const action = check?.additionalData?.ruleDefinedAction;
+	if (!itemUuid && ACTIONS[action]) return actionPlan(msg, check, action);
 	if (!itemUuid) return null;
 	let item = null;
 	try {
@@ -89,6 +91,35 @@ export function planFromMessage(msg) {
 		fumble: !!check?.fumble,
 		name: item.name,
 		itemType: item.type,
+		user: src.document?.name ?? src.actor?.name ?? '',
+		portrait: src.actor?.img ?? src.document?.texture?.src ?? null,
+	};
+}
+
+/** Guard, Study, Hinder: Project FU posts them as Checks with no item */
+function actionPlan(msg, check, action) {
+	const { spec } = actionSpec(action);
+	if (!spec || spec.style === 'none') return null;
+	const src = sourceToken(msg, null);
+	if (!src) return null;
+	const listed = Array.isArray(check?.additionalData?.targets) ? check.additionalData.targets : null;
+	const targets = listed?.length
+		? listed.map((t) => ({ token: tokenFromUuid(t.uuid), result: t.result ?? 'none' })).filter((t) => t.token)
+		: action === 'guard'
+			? []
+			: [...(game.user.targets ?? [])].map((t) => ({ token: t, result: 'none' }));
+	return {
+		scene: canvas.scene.id,
+		source: src.id,
+		targets: targets.filter((t) => t.token !== src).map((t) => ({ id: t.token.id, result: t.result })),
+		spec,
+		element: spec.element && spec.element !== 'auto' ? spec.element : 'none',
+		afterElement: spec.afterElement ?? 'none',
+		offensive: action === 'hinder',
+		crit: !!check?.critical,
+		fumble: !!check?.fumble,
+		name: ACTIONS[action].name,
+		itemType: 'action',
 		user: src.document?.name ?? src.actor?.name ?? '',
 		portrait: src.actor?.img ?? src.document?.texture?.src ?? null,
 	};

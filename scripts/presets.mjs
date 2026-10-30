@@ -199,11 +199,31 @@ export function weaponKey(item) {
 	return cat && WEAPON_CATEGORIES[cat] ? `wpn:${cat}` : null;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Basic actions: Guard, Study, Hinder (chat cards with no item)       */
+/* ------------------------------------------------------------------ */
+
+export const ACTIONS = {
+	guard: { name: 'Guard', spec: { style: 'self', cast: 'sf-defense-up', hit: 'sf-shield', element: 'none' } },
+	study: { name: 'Study', spec: { style: 'support', cast: 'sf-sym-question', hit: 'sf-sym-alert', after: 'sf-sym-bulb', element: 'none' } },
+	hinder: { name: 'Hinder', spec: { style: 'spell', cast: 'sf-curse', hit: 'sf-chains', element: 'none' } },
+};
+
+/** A basic action's animation: the world's choice, else the built-in one */
+export function actionSpec(action) {
+	const key = `act:${action}`;
+	const world = worldOverrides()[key];
+	if (world?.style) return { spec: current(world), source: 'world' };
+	const def = presetFor(key);
+	return def ? { spec: def, source: 'default' } : { spec: null, source: 'none' };
+}
+
 /** Built-in animation for a table key */
 export function defaultFor(key) {
 	if (!key) return null;
 	if (key.startsWith('bst:')) return BESTIARY[key.slice(4)]?.spec ?? null;
 	if (key.startsWith('wpn:')) return WEAPON_CATEGORIES[key.slice(4)] ? weaponSpec(sampleWeapon(key.slice(4))) : null;
+	if (key.startsWith('act:')) return ACTIONS[key.slice(4)]?.spec ?? null;
 	return ABILITIES[key]?.spec ?? null;
 }
 
@@ -213,6 +233,10 @@ export function entryFor(key) {
 	if (key.startsWith('bst:')) {
 		const b = BESTIARY[key.slice(4)];
 		return b ? { name: b.name, group: `Bestiary: ${b.book}` } : null;
+	}
+	if (key.startsWith('act:')) {
+		const a = ACTIONS[key.slice(4)];
+		return a ? { name: a.name, group: 'Actions' } : null;
 	}
 	if (key.startsWith('wpn:')) {
 		const words = WEAPON_WORDS[key.slice(4)];
@@ -334,7 +358,7 @@ export function inPreset(spec, ctx = {}) {
 }
 
 /** Animations saved before the old sprite effects were removed: translate whatever still names one */
-function current(spec, item, ctx = {}) {
+function current(spec, item = null, ctx = {}) {
 	return FIELDS.some((f) => isRecipeId(spec[f])) ? inPreset(spec, { item, damageType: ctx.damageType }) : spec;
 }
 
@@ -342,6 +366,8 @@ function current(spec, item, ctx = {}) {
 export function presetFor(key, ctx = {}) {
 	const def = defaultFor(key);
 	if (!def) return null;
+	// basic actions are already pixel effects, which play in every preset
+	if (key.startsWith('act:')) return JSON.parse(JSON.stringify(def));
 	const item = ctx.item ?? (key?.startsWith('wpn:') ? sampleWeapon(key.slice(4)) : undefined);
 	return inPreset(def, { ...ctx, item, key });
 }

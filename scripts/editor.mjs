@@ -1,4 +1,4 @@
-import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, MODULE_ID, PRESETS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
+import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, MODULE_ID, PRESETS, ACTIONS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
 import { JBFX, isJb, jbModule } from './jbcore.mjs';
 import { resolveElement, runPlan } from './sequence.mjs';
 import { autoSounds, playSound, soundGroups, soundLabel } from './audio.mjs';
@@ -491,12 +491,13 @@ export class AnimationLibrary extends ApplicationV2 {
 		const groups = {};
 		for (const [fuid, a] of Object.entries(ABILITIES)) (groups[a.group] ??= []).push([fuid, a]);
 		for (const [key, b] of Object.entries(BESTIARY)) (groups[`Bestiary: ${b.book}`] ??= []).push([`bst:${key}`, { ...b, kindLabel: key.split(':')[0] }]);
+		for (const id of Object.keys(ACTIONS)) (groups.Actions ??= []).push([`act:${id}`, { name: ACTIONS[id].name, spec: defaultFor(`act:${id}`) }]);
 		// one entry per kind of weapon: every sword, every bow... unless a weapon has its own
 		for (const cat of Object.keys(WEAPON_CATEGORIES)) {
 			const key = `wpn:${cat}`;
 			(groups.Weapons ??= []).push([key, { name: entryFor(key).name, spec: defaultFor(key) }]);
 		}
-		const late = (g) => (g.startsWith('Bestiary') ? 5 : g === 'Heroic Skills' ? 4 : g === 'NPC Spells' ? 3 : g === 'Weapons' ? 2 : g === 'Items' ? 1 : 0);
+		const late = (g) => (g.startsWith('Bestiary') ? 5 : g === 'Heroic Skills' ? 4 : g === 'NPC Spells' ? 3 : g === 'Weapons' ? 2 : g === 'Actions' ? 1.5 : g === 'Items' ? 1 : 0);
 		const order = Object.keys(groups).sort((a, b) => late(a) - late(b) || a.localeCompare(b));
 		const body = order
 			.map((g) => {
