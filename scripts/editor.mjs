@@ -1,10 +1,10 @@
-import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, MODULE_ID, PRESETS, ACTIONS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
+import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, MODULE_ID, PRESETS, ACTIONS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, fxLabel, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
 import { JBFX, isJb, jbModule } from './jbcore.mjs';
 import { resolveElement, runPlan } from './sequence.mjs';
 import { autoSounds, playSound, soundGroups, soundLabel } from './audio.mjs';
 import { IMPACT_FIELDS, autoText, feelOf } from './feel.mjs';
 import { cutIn } from './impact.mjs';
-import { PIXEL, PixelPreview, isPixel } from './pixel.mjs';
+import { PIXEL, PixelPreview, isPixel, pixelDuration } from './pixel.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -18,20 +18,6 @@ const SOURCE_TEXT = {
 	default: 'Using the built-in animation for this ability',
 	guess: 'Picked automatically from the item',
 };
-
-function fxOptions(selected, allowNone = true) {
-	let html = allowNone ? `<option value="" ${!selected ? 'selected' : ''}>None</option>` : '';
-	for (const [cat, list] of fxGroups()) {
-		html += `<optgroup label="${esc(cat)}">${list.map(([id, label]) => `<option value="${id}" ${id === selected ? 'selected' : ''}>${esc(label)}</option>`).join('')}</optgroup>`;
-	}
-	return html;
-}
-
-function projOptions(selected) {
-	let html = `<option value="" ${!selected ? 'selected' : ''}>None</option>`;
-	for (const [cat, list] of projectileGroups()) html += `<optgroup label="${esc(cat)}">${list.map(([id, label]) => `<option value="${id}" ${id === selected ? 'selected' : ''}>${esc(label)}</option>`).join('')}</optgroup>`;
-	return html;
-}
 
 const opts = (map, selected) => Object.entries(map).map(([k, l]) => `<option value="${k}" ${k === (selected ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('');
 
@@ -142,6 +128,7 @@ export class AnimationEditor extends ApplicationV2 {
 		position: { width: 560, height: 'auto' },
 		actions: {
 			playSound: AnimationEditor.#onPlaySound,
+			pick: AnimationEditor.#onPick,
 			pickPortrait: AnimationEditor.#onPickPortrait,
 			clearPortrait: AnimationEditor.#onClearPortrait,
 			previewCutin: AnimationEditor.#onPreviewCutin,
@@ -209,10 +196,10 @@ export class AnimationEditor extends ApplicationV2 {
 			</header>
 			<div class="grid">
 				<label class="wide"><span>Style</span><select data-k="style">${opts(STYLES, s.style)}</select></label>
-				<label ${none ? 'class="off"' : ''}><span>On the user first</span><select data-k="cast">${fxOptions(s.cast)}</select></label>
-				<label ${none || s.style === 'self' ? 'class="off"' : ''}><span>Projectile</span><select data-k="projectile">${projOptions(s.projectile)}</select></label>
-				<label ${none ? 'class="off"' : ''}><span>${s.style === 'self' ? 'On the user' : 'On each target'}</span><select data-k="hit">${fxOptions(s.hit)}</select></label>
-				<label ${none ? 'class="off"' : ''}><span>Back on the user after</span><select data-k="after">${fxOptions(s.after)}</select></label>
+				${this.#slot('cast', 'On the user first', none)}
+				${this.#slot('projectile', 'Projectile', none || s.style === 'self')}
+				${this.#slot('hit', s.style === 'self' ? 'On the user' : 'On each target', none)}
+				${this.#slot('after', 'Back on the user after', none)}
 				<div class="snd colorpick ${none ? 'off' : ''}"><span>Color</span><div class="row"><select data-k="element" aria-label="Color">${opts({ ...ELEMENTS, custom: 'Custom color…' }, isHexColor(s.element) ? 'custom' : (s.element ?? 'auto'))}</select>${isHexColor(s.element) ? `<input type="color" data-k="elementColor" value="${esc(s.element)}" aria-label="Custom color" data-tooltip="Any color: recolors this animation in every preset, JB2A Free included">` : ''}</div></div>
 				<label ${none ? 'class="off"' : ''}><span>Size <output>${Number(s.scale ?? 1).toFixed(1)}×</output></span><input type="range" data-k="scale" min="0.5" max="2.5" step="0.1" value="${s.scale ?? 1}"></label>
 				<div class="snd ${none ? 'off' : ''}"><span>Sound on use</span><div class="row"><select data-k="castSound">${this.#soundOptions(s.castSound, auto.cast ?? auto.projectile)}</select><button type="button" class="play" data-action="playSound" data-which="cast" aria-label="Play the use sound" data-tooltip="Play">▶</button></div></div>
@@ -245,6 +232,29 @@ export class AnimationEditor extends ApplicationV2 {
 				<button type="button" data-action="save" class="gold">Save</button>
 			</footer>`;
 		return div;
+	}
+
+	/** An effect slot: shows the choice, opens the grid picker */
+	#slot(field, label, off) {
+		const id = this.spec[field];
+		return `<div class="snd slot ${off ? 'off' : ''}"><span>${esc(label)}</span><button type="button" class="pick" data-action="pick" data-field="${field}" aria-label="${esc(label)}: ${esc(id ? fxLabel(id) : 'None')}. Choose"><b>${esc(id ? fxLabel(id) : 'None')}</b><i class="fa-solid fa-table-cells-large"></i></button></div>`;
+	}
+
+	static #onPick(event, target) {
+		const field = target.dataset.field;
+		const labels = { cast: 'on the user first', projectile: 'projectile', hit: 'on the target', after: 'back on the user' };
+		EffectPicker.open({
+			title: `${this.name}: ${labels[field]}`,
+			current: this.spec[field] ?? '',
+			element: field === 'after' ? (this.spec.afterElement ?? 'none') : this.previewElement,
+			groups: field === 'projectile' ? projectileGroups() : fxGroups(),
+			near: this,
+			onPick: (id) => {
+				if (id) this.spec[field] = id;
+				else delete this.spec[field];
+				this.render();
+			},
+		});
 	}
 
 	/** What "automatic" means for this ability, before anyone's comfort settings */
@@ -470,6 +480,187 @@ export class AnimationEditor extends ApplicationV2 {
 			portrait: src.actor?.img ?? null,
 		});
 		if (!targets.length && this.spec.style !== 'self') ui.notifications.info('Target a token to see the hit too.');
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/*  Effect picker: every effect as a tile, still until you hover it     */
+/* ------------------------------------------------------------------ */
+
+/** One tile's preview: pixel effects get a still frame and play on hover; JB2A videos play on hover */
+class Tile {
+	constructor(el, id, element) {
+		this.el = el;
+		this.id = id;
+		this.element = element;
+		this.canvas = el.querySelector('canvas');
+	}
+	/** a frame from the middle of the effect, drawn once */
+	still() {
+		if (this.drawn || !isPixel(this.id)) return;
+		this.drawn = true;
+		this.px = new PixelPreview(this.canvas);
+		this.px.set(this.id, this.element);
+		// projectiles are caught mid-flight, the rest around their peak
+		const at = PIXEL[this.id].proj || PIXEL[this.id].line ? 0.6 : 0.45;
+		const steps = Math.round(Math.min(1.4, (pixelDuration(this.id) / 1000) * at) * 30);
+		for (let i = 0; i < steps; i++) this.px.frame(1 / 30);
+		this.canvas.style.filter = PIXEL[this.id].ramp ? 'none' : cssFilter(PIXEL[this.id], this.element);
+	}
+	play() {
+		if (isPixel(this.id)) {
+			this.still();
+			let last = performance.now();
+			const loop = (t) => {
+				this.raf = requestAnimationFrame(loop);
+				this.px.frame(Math.min(0.05, (t - last) / 1000));
+				last = t;
+			};
+			this.raf = requestAnimationFrame(loop);
+		} else if (isJb(this.id) && jbModule()) {
+			const fx = JBFX[this.id];
+			const file = fx.file ?? (fx.variants.find((x) => x.ft === 30) ?? fx.variants[0]).file;
+			if (!this.vid) {
+				this.vid = Object.assign(document.createElement('video'), { muted: true, loop: true, playsInline: true, src: `modules/${jbModule()}/${file}` });
+				this.vid.style.filter = cssFilter(fx, this.element);
+				this.canvas.replaceWith(this.vid);
+			}
+			this.vid.play().catch(() => {});
+		}
+	}
+	stop() {
+		cancelAnimationFrame(this.raf);
+		this.vid?.pause();
+	}
+	destroy() {
+		this.stop();
+		if (this.vid) {
+			this.vid.removeAttribute('src');
+			this.vid.load();
+		}
+	}
+}
+
+export class EffectPicker extends ApplicationV2 {
+	static DEFAULT_OPTIONS = {
+		id: 'fua-picker',
+		classes: ['fua-app', 'fua-picker'],
+		window: { title: 'Pick an effect', icon: 'fa-solid fa-table-cells-large', resizable: true },
+		position: { width: 760, height: 660 },
+	};
+
+	/** @param {{title:string, current:string, element:string, groups:Array, onPick:Function, near?:ApplicationV2}} opts */
+	static open(opts) {
+		foundry.applications.instances.get('fua-picker')?.close();
+		const app = new EffectPicker(opts);
+		const n = opts.near?.position;
+		const pos = {};
+		if (n && n.left + n.width + 770 < window.innerWidth) Object.assign(pos, { left: n.left + n.width + 8, top: n.top });
+		return app.render({ force: true, position: pos });
+	}
+
+	constructor(opts) {
+		super({ window: { title: opts.title } });
+		this.opts = opts;
+		this.tiles = [];
+		this.cat = 'all';
+	}
+
+	async _renderHTML() {
+		const { groups, current } = this.opts;
+		const div = document.createElement('div');
+		div.className = 'fua-pick';
+		const tile = (id, label, cat) =>
+			`<button type="button" class="tile ${id === current ? 'on' : ''}" data-id="${esc(id)}" data-cat="${esc(cat)}" data-search="${esc(`${label} ${cat}`.toLowerCase())}" title="${esc(label)}"><span class="pv">${id ? '<canvas width="120" height="120"></canvas>' : '<i class="fa-solid fa-ban"></i>'}${isJb(id) ? '<em>JB2A</em>' : ''}</span><span class="nm">${esc(label)}</span></button>`;
+		div.innerHTML = `
+			<div class="top">
+				<input type="search" placeholder="Search effects" aria-label="Search effects">
+				<div class="chips"><button type="button" class="chip on" data-cat="all">All</button>${groups.map(([cat]) => `<button type="button" class="chip" data-cat="${esc(cat)}">${esc(cat.replace(/^Pixel /, ''))}</button>`).join('')}</div>
+			</div>
+			<div class="grid-wrap">
+				<section data-cat="none"><div class="tiles">${tile('', 'None', 'none')}</div></section>
+				${groups.map(([cat, list]) => `<section data-cat="${esc(cat)}"><h4>${esc(cat)}</h4><div class="tiles">${list.map(([id, label]) => tile(id, label, cat)).join('')}</div></section>`).join('')}
+			</div>
+			<p class="note">Hover a tile to play it, click to choose. Colors follow the animation's color setting.</p>`;
+		return div;
+	}
+
+	_replaceHTML(result, content) {
+		this.#teardown();
+		content.replaceChildren(result);
+	}
+
+	_onRender() {
+		const root = this.element;
+		const search = root.querySelector('input[type="search"]');
+		const filter = () => {
+			const q = search.value.trim().toLowerCase();
+			for (const sec of root.querySelectorAll('section[data-cat]')) {
+				let any = false;
+				for (const t of sec.querySelectorAll('.tile')) {
+					const show = (this.cat === 'all' || t.dataset.cat === this.cat || t.dataset.cat === 'none') && (!q || t.dataset.search.includes(q));
+					t.hidden = !show;
+					any ||= show;
+				}
+				sec.hidden = !any;
+			}
+		};
+		search.addEventListener('input', filter);
+		root.querySelectorAll('.chip').forEach((c) =>
+			c.addEventListener('click', () => {
+				this.cat = c.dataset.cat;
+				root.querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === c));
+				filter();
+			}),
+		);
+		// still frames for the tiles that scroll into view, a few at a time so the window stays responsive
+		const queue = [];
+		let busy = false;
+		const pump = () => {
+			if (busy) return;
+			busy = true;
+			const step = () => {
+				const t = queue.shift();
+				if (!t) return (busy = false);
+				t.still();
+				setTimeout(step, 0);
+			};
+			step();
+		};
+		this.io = new IntersectionObserver((entries) => {
+			for (const e of entries) if (e.isIntersecting) {
+				queue.push(e.target._tile);
+				this.io.unobserve(e.target);
+			}
+			pump();
+		}, { root: root.querySelector('.grid-wrap'), rootMargin: '120px' });
+		for (const el of root.querySelectorAll('.tile')) {
+			const id = el.dataset.id;
+			if (id) {
+				el._tile = new Tile(el, id, this.opts.element);
+				this.tiles.push(el._tile);
+				if (isPixel(id)) this.io.observe(el);
+				el.addEventListener('mouseenter', () => el._tile.play());
+				el.addEventListener('mouseleave', () => el._tile.stop());
+			}
+			el.addEventListener('click', () => {
+				this.opts.onPick(id);
+				this.close();
+			});
+		}
+		root.querySelector('.tile.on')?.scrollIntoView({ block: 'center' });
+		search.focus();
+	}
+
+	#teardown() {
+		this.io?.disconnect();
+		for (const t of this.tiles) t.destroy();
+		this.tiles = [];
+	}
+
+	_onClose(options) {
+		this.#teardown();
+		return super._onClose?.(options);
 	}
 }
 
