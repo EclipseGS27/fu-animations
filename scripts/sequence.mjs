@@ -5,7 +5,7 @@ import { hitstop } from './clock.mjs';
 import { feelOf } from './feel.mjs';
 import * as I from './impact.mjs';
 import { isJb, playJb } from './jb2a.mjs';
-import { isPixel, playPixel } from './pixel.mjs';
+import { isPixel, playPixel, tokenFeet } from './pixel.mjs';
 import { PIXEL_CRIT } from './pixelmap.mjs';
 
 /**
@@ -119,6 +119,7 @@ async function land(plan, F, src, token, at, { crit, miss, ux, uy, first }) {
 	const size = sizeOf(token);
 	recentHits.set(token.id, { crit, element: plan.element, at: Date.now() });
 	if (miss) {
+		if (getSetting('numbers') !== false) I.damageNumber(token, 'MISS', { kind: 'miss' });
 		I.afterimages(token, 220, 0xffffff);
 		return dodge(token, ux, uy);
 	}
@@ -132,7 +133,8 @@ async function land(plan, F, src, token, at, { crit, miss, ux, uy, first }) {
 		const kinds = F.debris === 'mixed' ? ['spark', 'chip'] : [F.debris];
 		for (const kind of kinds) I.debris(b, { color: kind === 'chip' ? 0x3a2f28 : color, count: Math.round(F.debrisCount / kinds.length), power: 0.7 + F.ring * 0.4, dir, kind });
 	}
-	if (F.scorch) I.scorch(b, { color: F.mark, size: Math.min(3, F.ring * size * 0.9) });
+	// the mark stays on the ground, under the target's feet
+	if (F.scorch) I.scorch(tokenFeet(token) ?? { x: b.x, y: b.y + canvas.grid.size * 0.3 }, { color: F.mark, size: Math.min(3, F.ring * size * 0.9) });
 	if (first) {
 		if (F.screen) I.screenFlash(color, F.screen, 160);
 		if (F.freeze) {
@@ -206,11 +208,13 @@ async function strike(plan, F, src, t, first) {
 }
 
 /** Something flying from the user to a target */
-function fly(plan, F, kind, from, to, i) {
+function fly(plan, F, kind, from, to, i, toToken = null) {
 	const color = F.color;
+	// warning circles go on the ground under the target
+	const floor = (toToken && tokenFeet(toToken)) || to;
 	if (isJb(kind)) return playJb(kind, { x: to.x, y: to.y, from, to, element: plan.element, scale: plan.spec.scale && plan.spec.scale > 1 ? 1.15 : 1 }).hit;
 	if (isPixel(kind)) {
-		if (kind === 'sf-meteor') I.telegraph(to, { color, size: 1.2 * F.ring, ms: 900 });
+		if (kind === 'sf-meteor') I.telegraph(floor, { color, size: 1.2 * F.ring, ms: 900 });
 		return playPixel(kind, { x: to.x, y: to.y, from, to, element: plan.element, scale: plan.spec.scale && plan.spec.scale > 1 ? 1.15 : 1 }).hit;
 	}
 	if (kind === 'orb') {
@@ -222,7 +226,7 @@ function fly(plan, F, kind, from, to, i) {
 	if (kind === 'meteor') {
 		const g = canvas.grid.size;
 		const start = { x: to.x - g * 2.6, y: to.y - g * 4.2 };
-		I.telegraph(to, { color, size: 1.2 * F.ring, ms: 820 });
+		I.telegraph(floor, { color, size: 1.2 * F.ring, ms: 820 });
 		return wait(220).then(() => I.blazingProjectile(start, to, { color, glow: shade(color, 0.6), size: Math.max(0.6, F.orb * 1.8), ms: 600, fall: 1.5, embers: 6 }));
 	}
 	return projectile(kind, from, to, plan.element);
@@ -348,7 +352,7 @@ async function perform(plan, F, src, targets, snd) {
 	await Promise.all(
 		targets.map(async (t, i) => {
 			await wait(i * (spec.projectile ? 150 : 90));
-			if (spec.projectile && src && t.token !== src) await fly(plan, F, spec.projectile, center(src), center(t.token), i);
+			if (spec.projectile && src && t.token !== src) await fly(plan, F, spec.projectile, center(src), center(t.token), i, t.token);
 			const first = firstHit;
 			firstHit = false;
 			return strike(plan, F, src, t, first || F.level === 'heavy' || F.level === 'heroic');

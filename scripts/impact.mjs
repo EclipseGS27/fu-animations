@@ -248,6 +248,7 @@ export function burstFlash(at, { color = 0xffffff, size = 1.6 } = {}) {
 }
 
 /** A mark left on the ground that fades out */
+/** A dark mark on the ground; at is where the target stands (its feet) */
 export function scorch(at, { color = 0x1a0d06, size = 1, ms = 2600 } = {}) {
 	const { underLayer: L } = layers();
 	const gr = new PIXI.Graphics();
@@ -256,7 +257,7 @@ export function scorch(at, { color = 0x1a0d06, size = 1, ms = 2600 } = {}) {
 	return run(ms, (t) => {
 		gr.clear();
 		const a = t < 0.1 ? t / 0.1 : 1 - Math.max(0, (t - 0.5) / 0.5);
-		for (const b of blobs) gr.beginFill(color, 0.32 * a).drawEllipse(at.x + b.x * g() * size, at.y + g() * 0.3 + b.y * g() * size * 0.5, b.r * g() * size, b.r * g() * size * 0.45).endFill();
+		for (const b of blobs) gr.beginFill(color, 0.32 * a).drawEllipse(at.x + b.x * g() * size, at.y + b.y * g() * size * 0.5, b.r * g() * size, b.r * g() * size * 0.45).endFill();
 	}).then(() => gr.destroy());
 }
 
@@ -484,16 +485,38 @@ export function blazingProjectile(from, to, { color = 0xff7a2a, glow = null, siz
 /* ------------------------------------------------------------------ */
 
 /** Damage number that slams in, overshoots, bounces and floats away */
-export function damageNumber(token, text, { crit = false, heal = false, sub = '' } = {}) {
+/** token id -> stack slots in use, so a MISS and a hit (or several hits) sit one above the other */
+const numberSlots = new Map();
+
+const NUMBER_LOOK = {
+	miss: { color: 0xbcd0ff, size: 0.36 },
+	immune: { color: 0xc9cfdd, size: 0.36 },
+	weak: { color: 0xffa25e, size: 0.52 },
+	resist: { color: 0xb7c3db, size: 0.44 },
+};
+
+/**
+ * @param {Token} token
+ * @param {string} text
+ * @param {{crit?:boolean, heal?:boolean, sub?:string, kind?:'miss'|'immune'|'weak'|'resist'|''}} [opts]
+ */
+export function damageNumber(token, text, { crit = false, heal = false, sub = '', kind = '' } = {}) {
 	const { numLayer: L } = layers();
 	const c = center(token);
+	const used = numberSlots.get(token.id) ?? new Set();
+	let slot = 0;
+	while (used.has(slot)) slot++;
+	used.add(slot);
+	numberSlots.set(token.id, used);
+	const lift = slot * g() * 0.42;
+	const look = NUMBER_LOOK[kind] ?? null;
 	const box = new PIXI.Container();
-	box.position.set(c.x, c.y - g() * 0.35);
-	const color = heal ? 0x7dffb0 : crit ? 0xffd34d : 0xffffff;
+	box.position.set(c.x, c.y - g() * 0.35 - lift);
+	const color = heal ? 0x7dffb0 : crit ? 0xffd34d : (look?.color ?? 0xffffff);
 	const num = new PIXI.Text(text, {
 		fontFamily: 'FBUI Antonio, Antonio, Arial Black, Arial',
 		fontWeight: '700',
-		fontSize: g() * (crit ? 0.62 : 0.48),
+		fontSize: g() * (crit ? 0.62 : (look?.size ?? 0.48)),
 		fill: color,
 		stroke: 0x10060a,
 		strokeThickness: g() * 0.07,
@@ -511,14 +534,18 @@ export function damageNumber(token, text, { crit = false, heal = false, sub = ''
 		box.addChild(s);
 	}
 	L.addChild(box);
-	const side = rand(-0.25, 0.25);
+	const side = slot ? 0 : rand(-0.25, 0.25);
 	return run(1150, (t) => {
 		const pop = t < 0.12 ? ease.back(t / 0.12) * (crit ? 1.5 : 1.25) : t < 0.22 ? 1.25 - (t - 0.12) * 2 : 1;
 		box.scale.set(Math.max(0.01, pop));
 		box.x = c.x + side * g() * t;
-		box.y = c.y - g() * 0.35 - g() * 0.55 * ease.out(t);
+		box.y = c.y - g() * 0.35 - lift - g() * 0.55 * ease.out(t);
 		box.alpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
-	}).then(() => box.destroy({ children: true }));
+	}).then(() => {
+		box.destroy({ children: true });
+		used.delete(slot);
+		if (!used.size) numberSlots.delete(token.id);
+	});
 }
 
 /* ------------------------------------------------------------------ */

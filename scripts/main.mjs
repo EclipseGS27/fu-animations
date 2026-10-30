@@ -5,9 +5,11 @@ import { SOCKET, planFromMessage, runPlan } from './sequence.mjs';
 import { AnimationEditor, AnimationLibrary } from './editor.mjs';
 import { resetImpactLayers } from './impact.mjs';
 import { resetPixelLayers } from './pixel.mjs';
-import { registerNumbers } from './numbers.mjs';
+import { onDamageInfo, registerNumbers } from './numbers.mjs';
+import { refreshAll as refreshStatuses, registerStatuses } from './statuses.mjs';
 
 registerNumbers();
+registerStatuses();
 
 /* ------------------------------------------------------------------ */
 /*  Settings                                                           */
@@ -24,10 +26,11 @@ Hooks.once('init', () => {
 		default: 'original',
 		onChange: () => foundry.applications.instances.get('fua-library')?.render(),
 	});
-	reg('enabled', { name: 'Play animations', hint: 'Show attack, spell and skill animations on the scene.', scope: 'client', type: Boolean, default: true });
+	reg('enabled', { name: 'Play animations', hint: 'Show attack, spell and skill animations on the scene.', scope: 'client', type: Boolean, default: true, onChange: () => refreshStatuses() });
 	reg('moveMelee', { name: 'Melee attacks dash to the target', hint: 'The attacker lunges next to its target, strikes, then returns to its spot. Visual only: the token never really moves.', scope: 'world', type: Boolean, default: true });
 	reg('idleBob', { name: 'Hover during conflicts', hint: 'Tokens in the active conflict gently bob in place while they wait.', scope: 'client', type: Boolean, default: true, onChange: () => refreshBobbing() });
 	reg('bobAmount', { name: 'Hover height', scope: 'client', type: Number, range: { min: 0.5, max: 3, step: 0.5 }, default: 1 });
+	reg('statusLoops', { name: 'Show conditions on tokens', hint: 'While a token is poisoned, dazed, shaken, slow, weak, enraged or asleep, a small looping effect plays on it and its sprite is tinted.', scope: 'client', type: Boolean, default: true, onChange: () => refreshStatuses() });
 	reg('scale', { name: 'Effect size', hint: 'Multiplier for every effect, on top of each animation’s own size.', scope: 'client', type: Number, range: { min: 0.5, max: 2, step: 0.1 }, default: 1 });
 	reg('sound', { name: 'Play sound effects', hint: 'Animations play their sounds on the Environment volume channel.', scope: 'client', type: Boolean, default: true });
 	reg('soundVolume', { name: 'Sound effect volume', scope: 'client', type: Number, range: { min: 0, max: 1, step: 0.05 }, default: 0.7 });
@@ -59,6 +62,7 @@ Hooks.once('ready', () => {
 	if (game.user.isGM && game.settings.get(MODULE_ID, 'preset') === 'jb2a' && !jbAvailable()) ui.notifications.warn('Battle Animations: the JB2A preset is on but the JB2A module is not active, so the Original preset plays. Turn on "JB2A - Free Content" in Manage Modules.');
 	game.socket.on(SOCKET, (msg) => {
 		if (msg?.type === 'play') runPlan(msg.plan);
+		else if (msg?.type === 'dmg') onDamageInfo(msg.data);
 	});
 	refreshBobbing();
 });
