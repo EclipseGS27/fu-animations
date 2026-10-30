@@ -1,10 +1,12 @@
-import { FX, MODULE_ID, getSetting, itemDamageType, resolveSpec } from './presets.mjs';
+import { FX, MODULE_ID, activePreset, getSetting, itemDamageType, resolveSpec } from './presets.mjs';
 import { playSound, soundsFor } from './audio.mjs';
 import { center, dodge, ease, fxDuration, knockback, lunge, playFx, preload, projectile, tweenOffset, wait } from './player.mjs';
 import { hitstop } from './clock.mjs';
 import { feelOf } from './feel.mjs';
 import * as I from './impact.mjs';
 import { isJb, playJb } from './jb2a.mjs';
+import { isPixel, playPixel } from './pixel.mjs';
+import { PIXEL_CRIT } from './pixelmap.mjs';
 
 /**
  * Turning a chat card into an animation plan (on the client that rolled it), and playing a plan (on every client).
@@ -168,15 +170,21 @@ async function strike(plan, F, src, t, first) {
 		scale: (spec.scale ?? 1) * (crit ? 1.35 : 1) * (miss ? 0.8 : 1) * (F.level === 'heroic' ? 1.25 : 1),
 		alpha: miss ? 0.4 : 1,
 		tokenSize: sizeOf(token),
+		token,
+		source: src,
 	};
 	const jobs = [];
 	const snd = plan._snd;
-	// JB2A swings, beams and breaths take a moment to reach the target: land the hit then
+	// JB2A swings, beams and breaths, and pixel strikes from the sky, take a moment to reach the target: land the hit then
 	let contact = Promise.resolve();
 	if (spec.hit) {
 		if (isJb(spec.hit)) {
 			const from = src && src.mesh && src !== token ? { x: src.mesh.x, y: src.mesh.y } : a;
 			const p = playJb(spec.hit, { ...at, from });
+			jobs.push(p);
+			contact = p.hit;
+		} else if (isPixel(spec.hit)) {
+			const p = playPixel(spec.hit, at);
 			jobs.push(p);
 			contact = p.hit;
 		} else jobs.push(playFx(spec.hit, at));
@@ -190,7 +198,7 @@ async function strike(plan, F, src, t, first) {
 				else playSound(snd.hit);
 				if (crit) playSound(snd.crit);
 			}
-			if (crit) playFx('impact-flash-3', { x: b.x, y: b.y, rotation: at.rotation, scale: 1.2, element: 'none', tokenSize: at.tokenSize });
+			if (crit) playFx(activePreset() === 'pixel' ? PIXEL_CRIT : 'impact-flash-3', { x: b.x, y: b.y, from: a, to: b, rotation: at.rotation, scale: 1.2, element: 'none', tokenSize: at.tokenSize, token });
 			return land(plan, F, src, token, at, { crit, miss, ux, uy, first });
 		}),
 	);
@@ -201,6 +209,10 @@ async function strike(plan, F, src, t, first) {
 function fly(plan, F, kind, from, to, i) {
 	const color = F.color;
 	if (isJb(kind)) return playJb(kind, { x: to.x, y: to.y, from, to, element: plan.element, scale: plan.spec.scale && plan.spec.scale > 1 ? 1.15 : 1 }).hit;
+	if (isPixel(kind)) {
+		if (kind === 'sf-meteor') I.telegraph(to, { color, size: 1.2 * F.ring, ms: 900 });
+		return playPixel(kind, { x: to.x, y: to.y, from, to, element: plan.element, scale: plan.spec.scale && plan.spec.scale > 1 ? 1.15 : 1 }).hit;
+	}
 	if (kind === 'orb') {
 		const dist = Math.hypot(to.x - from.x, to.y - from.y);
 		const g = canvas.grid.size;
@@ -251,7 +263,7 @@ export async function runPlan(plan) {
 	const { spec } = plan;
 	const src = canvas.tokens.get(plan.source) ?? null;
 	const targets = (plan.targets ?? []).map((t) => ({ token: canvas.tokens.get(t.id), result: t.result })).filter((t) => t.token);
-	await preload([spec.cast, spec.hit, spec.after, isJb(spec.projectile) ? spec.projectile : null, plan.crit ? 'impact-flash-3' : null].filter(Boolean));
+	await preload([spec.cast, spec.hit, spec.after, isJb(spec.projectile) ? spec.projectile : null, plan.crit && activePreset() !== 'pixel' ? 'impact-flash-3' : null].filter(Boolean));
 	const snd = (plan._snd = soundsFor(spec, plan.element));
 	plan._heard = false;
 	plan._camera = false;
@@ -281,11 +293,11 @@ async function perform(plan, F, src, targets, snd) {
 		const c = center(src);
 		if (spec.cast) {
 			playSound(snd.cast);
-			playFx(spec.cast, { ...c, from: c, to: c, element: plan.element, scale: spec.scale, tokenSize: sizeOf(src) });
+			playFx(spec.cast, { ...c, from: c, to: c, element: plan.element, scale: spec.scale, tokenSize: sizeOf(src), token: src });
 			await wait(Math.min(700, fxDuration(spec.cast) * 0.45));
 		}
 		playSound(snd.hit);
-		await playFx(spec.hit, { ...c, from: c, to: c, element: plan.element, scale: spec.scale, tokenSize: sizeOf(src) });
+		await playFx(spec.hit, { ...c, from: c, to: c, element: plan.element, scale: spec.scale, tokenSize: sizeOf(src), token: src });
 		return;
 	}
 
@@ -299,11 +311,11 @@ async function perform(plan, F, src, targets, snd) {
 			await Promise.all(targets.map((t, i) => strike(plan, F, src, t, i === 0)));
 		} else if (src) {
 			playSound(snd.hit);
-			await playFx(spec.hit, { ...center(src), element: plan.element, scale: spec.scale, tokenSize: sizeOf(src) });
+			await playFx(spec.hit, { ...center(src), element: plan.element, scale: spec.scale, tokenSize: sizeOf(src), token: src });
 		}
 		if (spec.after && src) {
 			playSound(snd.after);
-			await playFx(spec.after, { ...center(src), element: plan.afterElement, tokenSize: sizeOf(src) });
+			await playFx(spec.after, { ...center(src), element: plan.afterElement, tokenSize: sizeOf(src), token: src });
 		}
 		return;
 	}
@@ -321,6 +333,7 @@ async function perform(plan, F, src, targets, snd) {
 			element: FX[spec.cast]?.cat === 'Healing' ? 'none' : plan.element,
 			scale: F.level === 'heroic' ? 1.3 : 1,
 			tokenSize: sizeOf(src),
+			token: src,
 		});
 		const hold = Math.min(spec.projectile ? 260 : 650, fxDuration(spec.cast) * 0.45);
 		if (F.offensive && (F.level === 'heavy' || F.level === 'heroic') && spec.style === 'spell') {
@@ -343,7 +356,7 @@ async function perform(plan, F, src, targets, snd) {
 	);
 	if (spec.after && src) {
 		playSound(snd.after);
-		await playFx(spec.after, { ...center(src), element: plan.afterElement, tokenSize: sizeOf(src) });
+		await playFx(spec.after, { ...center(src), element: plan.afterElement, tokenSize: sizeOf(src), token: src });
 	}
 }
 

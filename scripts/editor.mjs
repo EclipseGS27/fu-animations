@@ -5,6 +5,7 @@ import { PROC, isProc } from './procedural.mjs';
 import { autoSounds, playSound, soundGroups, soundLabel } from './audio.mjs';
 import { IMPACT_FIELDS, autoText, feelOf } from './feel.mjs';
 import { cutIn } from './impact.mjs';
+import { PIXEL, PixelPreview, isPixel } from './pixel.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 const ROOT = `modules/${MODULE_ID}/vfx/`;
@@ -74,7 +75,11 @@ class Preview {
 		if (id !== this.id) this.start = performance.now();
 		this.id = id;
 		this.element = element;
-		this.el.style.filter = isProc(id) ? 'none' : cssFilter(FX[id] ?? JBFX[id], element);
+		this.el.style.filter = isProc(id) ? 'none' : isPixel(id) ? (PIXEL[id].ramp ? 'none' : cssFilter(PIXEL[id], element)) : cssFilter(FX[id] ?? JBFX[id], element);
+		if (isPixel(id)) {
+			this.pixel ??= new PixelPreview(this.el);
+			this.pixel.set(id, element);
+		}
 		this.#video(id);
 		if (isProc(id)) this.#startProc();
 		else this.#stopProc();
@@ -156,6 +161,13 @@ class Preview {
 		this.raf = requestAnimationFrame(this.draw);
 		const { ctx, el } = this;
 		ctx.clearRect(0, 0, el.width, el.height);
+		if (isPixel(this.id)) {
+			const t = performance.now();
+			const dt = this.lastPixel ? (t - this.lastPixel) / 1000 : 1 / 60;
+			this.lastPixel = t;
+			this.pixel?.frame(dt);
+			return;
+		}
 		if (isJb(this.id)) {
 			const vd = this.vid;
 			if (!vd || vd.readyState < 2) return;

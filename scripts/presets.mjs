@@ -5,6 +5,8 @@ import { PROC } from './procedural.mjs';
 import { specFromName } from './keywords.mjs';
 import { JBFX, jbAvailable } from './jbcore.mjs';
 import { toJb } from './jbmap.mjs';
+import { PIXEL, PIXEL_PROJECTILES } from './pixelfx.mjs';
+import { toPixel } from './pixelmap.mjs';
 
 export const MODULE_ID = 'fu-animations';
 
@@ -19,11 +21,13 @@ export const STYLES = {
 
 export const PROJECTILES = { '': 'None', orb: 'Magic orb', arrow: 'Arrow', bullet: 'Bullet', beam: 'Beam', rock: 'Boulder', meteor: 'Meteor from the sky' };
 
-export const PRESETS = { original: 'Original', jb2a: 'JB2A (free)' };
+export const PRESETS = { original: 'Original', pixel: 'Pixel VFX (drawn in code)', jb2a: 'JB2A (free)' };
 
 /** The preset in use: JB2A only when the world chose it and the JB2A module is on */
 export function activePreset() {
-	return getSetting('preset') === 'jb2a' && jbAvailable() ? 'jb2a' : 'original';
+	const p = getSetting('preset');
+	if (p === 'pixel') return 'pixel';
+	return p === 'jb2a' && jbAvailable() ? 'jb2a' : 'original';
 }
 
 export const ELEMENTS = {
@@ -235,7 +239,10 @@ export function resolveSpec(item, ctx = {}) {
 
 /** An original animation as the active preset plays it */
 export function inPreset(spec, ctx = {}) {
-	return activePreset() === 'jb2a' ? toJb(spec, ctx) : spec;
+	const p = activePreset();
+	if (p === 'jb2a') return toJb(spec, ctx);
+	if (p === 'pixel') return toPixel(spec, ctx);
+	return spec;
 }
 
 /** The built-in animation for a table key in the active preset */
@@ -251,7 +258,7 @@ export function defaultSpec(item, ctx = {}) {
 }
 
 export function fxLabel(id) {
-	return id ? (FX[id]?.label ?? PROC[id]?.label ?? JBFX[id]?.label ?? id) : '';
+	return id ? (FX[id]?.label ?? PROC[id]?.label ?? PIXEL[id]?.label ?? JBFX[id]?.label ?? id) : '';
 }
 
 export function describe(spec) {
@@ -276,6 +283,13 @@ export function fxGroups() {
 	groups.Custom = Object.entries(PROC).map(([id, p]) => [id, p.label]);
 	for (const g of Object.values(groups)) g.sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
 	const out = Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+	// pixel effects are drawn in code, so they can be picked in any preset
+	const px = {};
+	for (const [id, f] of Object.entries(PIXEL)) (px[f.cat] ??= []).push([id, f.label]);
+	for (const g of Object.values(px)) g.sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
+	const pxGroups = Object.entries(px).sort((a, b) => a[0].localeCompare(b[0]));
+	if (activePreset() === 'pixel') out.unshift(...pxGroups);
+	else out.push(...pxGroups);
 	// JB2A effects can be picked in any preset, when the module is installed
 	if (jbAvailable()) {
 		const jb = {};
@@ -288,7 +302,7 @@ export function fxGroups() {
 
 /** Projectile choices: the drawn ones, plus every JB2A bolt, beam and thrown weapon */
 export function projectileGroups() {
-	const groups = [['Drawn', Object.entries(PROJECTILES).filter(([k]) => k)]];
+	const groups = [['Drawn', Object.entries(PROJECTILES).filter(([k]) => k)], ['Pixel', [...PIXEL_PROJECTILES].sort((a, b) => a[1].localeCompare(b[1]))]];
 	if (jbAvailable()) {
 		const jb = {};
 		for (const [id, f] of Object.entries(JBFX)) if (f.mode === 'stretch') (jb[f.cat] ??= []).push([id, f.label]);
