@@ -2,6 +2,14 @@
 
 Animations for Project FU (Foundry v13, Project FU 4.14+). Works on its own, and alongside Fabula Ultima Battle UI.
 
+![Pixel effects: breath, lightning, frost nova, explosion, whirlwind, pillar of light, shield dome, black hole](docs/effects.png)
+
+## Install
+In Foundry: **Add-on Modules → Install Module**, paste this Manifest URL and click Install:
+`https://raw.githubusercontent.com/EclipseGS27/fu-animations/main/module.json`
+
+Requires Foundry v13 and the Project FU system 4.14 or later. Enable **Fabula Ultima Battle Animations** in your world. The animations need nothing else; for sound, add the sound pack as described under [Assets not included](#assets-not-included). For the JB2A preset, also install the free **JB2A - Free Content** module.
+
 ## What plays
 - **Every class ability, spell, NPC spell and Core item in the Project FU compendium has an animation** (446 entries), picked to fit: Glacies freezes, Ignis burns, Heal glows green over your allies, Omega drops a death mark, Arcana flare up when summoned, dances, verses, therioforms, magiseeds and symbols each get their own. Passive Skills that never get used in a fight (Fortress, Dodge, Well-Traveled...) have none.
 - **Weapons and NPC basic attacks** animate from their category and damage type: swords, daggers and flails slash, heavy weapons and fists smash, spears thrust, bows fire arrows, firearms flash and shoot, thrown weapons fly, magic damage recolors the hit.
@@ -44,6 +52,8 @@ All 446 compendium entries and 611 bestiary attacks play in pixel art:
 - **Damage numbers**: when damage is applied, the number slams onto the token and bounces: gold and larger after a critical, with the element and the Affinity that applied under it (VULNERABLE in orange, RESISTED in grey-blue, ABSORBED as green healing), IMMUNE when nothing gets through, green for healing. A miss shows MISS as the target dodges. Several numbers on one token stack instead of overlapping. They replace the system's plain "-12 HP" text, and with Fabula Ultima Battle UI installed they replace its numbers too.
 - **Drains** (Drain Vigor, Drain Spirit, Soul Steal...) send a heal back to the user.
 - **Hover**: while a conflict runs, combatants on the scene bob gently in place. Defeated ones stay still.
+![Conditions on tokens: poisoned, dazed, shaken, slow, weak, enraged, asleep](docs/conditions.png)
+
 - **Conditions on the map**: while a token has a status, a small pixel-art loop plays on it and its sprite is tinted: poisoned bubbles (green), dazed stars circling its head, shaken trembling and a sweat drop, slow ripples at its feet (cold tint), weak sinking arrows (drained), enraged a throbbing anger mark (red), asleep floating Zs. Several tints take turns. Client setting.
 - **On the ground**: ground effects (explosions, lightning strikes, ice and rock spikes, pillars of light, puddles, rune glyphs, shield domes, scorch marks, meteor warning circles) start under the figure's feet, read from the token art, instead of halfway up its legs.
 
@@ -55,6 +65,8 @@ Every animation plays sounds from Helton Yan's Pixel Combat (317 sounds, up to t
 Sounds play on each player's Environment volume channel. Client settings: sound effects on or off, sound effect volume.
 
 ## Changing an animation
+![The effect picker: every effect as a tile, playing on hover](docs/picker.png)
+
 - **One item**: open the item sheet, header menu → **Animation**. Or right-click it in the Items directory. The choice is stored on that copy of the item, so two characters can animate the same sword differently, and everyone sees each attacker's own choice.
 - **An ability for the whole world** (GM): Settings → Ability animations → **Open the list**, search, **Edit**. Bestiary attacks are in the list too, grouped by book. Or save from an item's Animation window with "Every … in this world".
 - **A kind of weapon for the whole world** (GM): the list has a **Weapons** group with one entry per category (Swords, Daggers, Bows, Firearms, Heavy weapons, Shields...). What you set there plays for every weapon of that kind that has no animation of its own. A weapon's Animation window can also save "Every sword in this world".
