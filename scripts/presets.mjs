@@ -45,7 +45,7 @@ export const ELEMENTS = {
 };
 
 /** Hue (degrees) each element recolors to, and a color for tinting white effects and drawing projectiles */
-export const ELEMENT_LOOK = {
+const BASE_LOOK = {
 	physical: { hue: null, color: 0xf2e6c9 },
 	fire: { hue: 14, color: 0xff7a3d },
 	ice: { hue: 198, color: 0x8fd8ff },
@@ -57,6 +57,55 @@ export const ELEMENT_LOOK = {
 	poison: { hue: 96, color: 0xb4e05a },
 	none: { hue: null, color: 0xffd9a0 },
 };
+
+/* ------------------------------------------------------------------ */
+/*  Custom colors: any #rrggbb works where an element name does         */
+/* ------------------------------------------------------------------ */
+
+export const isHexColor = (s) => /^#[0-9a-f]{6}$/i.test(String(s ?? ''));
+
+/** "#ff2a6d" -> {h: degrees, s: 0..1, l: 0..1} */
+export function hexHsl(hexStr) {
+	const n = parseInt(String(hexStr).slice(1), 16);
+	const r = ((n >> 16) & 255) / 255;
+	const g = ((n >> 8) & 255) / 255;
+	const b = (n & 255) / 255;
+	const max = Math.max(r, g, b);
+	const min = Math.min(r, g, b);
+	const l = (max + min) / 2;
+	const d = max - min;
+	if (!d) return { h: 0, s: 0, l };
+	const s = d / (1 - Math.abs(2 * l - 1));
+	let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+	h = (h * 60 + 360) % 360;
+	return { h, s, l };
+}
+
+/** The recolor for a custom color: rotate colored effects to its hue, match its saturation and lightness, tint white ones */
+function hexLook(hexStr) {
+	const { h, s, l } = hexHsl(hexStr);
+	const look = { hue: s < 0.12 ? null : Math.round(h), color: parseInt(hexStr.slice(1), 16) };
+	if (s < 0.6) look.sat = Math.max(-0.95, (s - 0.6) * 1.6);
+	if (l > 0.7) look.bright = 1 + (l - 0.7) * 0.8;
+	else if (l < 0.3) look.bright = 0.55 + l * 1.5;
+	return look;
+}
+
+const hexLooks = new Map();
+/**
+ * Element looks by name, and custom colors by their hex code ("#ff2a6d"), computed on first use. A proxy so every
+ * place that recolors by element (sprite effects, JB2A videos, drawn effects, impact colors) takes custom colors too.
+ */
+export const ELEMENT_LOOK = new Proxy(BASE_LOOK, {
+	get(target, key) {
+		if (typeof key === 'string' && isHexColor(key)) {
+			const k = key.toLowerCase();
+			if (!hexLooks.has(k)) hexLooks.set(k, hexLook(k));
+			return hexLooks.get(k);
+		}
+		return target[key];
+	},
+});
 
 const ELEMENT_HIT = {
 	physical: 'px-impact-sym-1',
@@ -129,10 +178,36 @@ export function abilityKey(item) {
 	return fuid || null;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Weapon categories: one world-wide animation per kind of weapon      */
+/* ------------------------------------------------------------------ */
+
+/** Project FU's weapon categories, plus shields, as the editor and the list name them */
+export const WEAPON_CATEGORIES = { arcane: 'Arcane', bow: 'Bow', brawling: 'Brawling', dagger: 'Dagger', firearm: 'Firearm', flail: 'Flail', heavy: 'Heavy', spear: 'Spear', sword: 'Sword', thrown: 'Thrown', shield: 'Shield' };
+/** [list name, one of them] for each category */
+const WEAPON_WORDS = { arcane: ['Arcane weapons', 'arcane weapon'], bow: ['Bows', 'bow'], brawling: ['Brawling weapons', 'brawling weapon'], dagger: ['Daggers', 'dagger'], firearm: ['Firearms', 'firearm'], flail: ['Flails', 'flail'], heavy: ['Heavy weapons', 'heavy weapon'], spear: ['Spears', 'spear'], sword: ['Swords', 'sword'], thrown: ['Thrown weapons', 'thrown weapon'], shield: ['Shields', 'shield'] };
+/** "sword" for "wpn:sword" */
+export const weaponOne = (key) => WEAPON_WORDS[String(key ?? '').slice(4)]?.[1] ?? 'weapon';
+const RANGED_CATS = new Set(['bow', 'firearm', 'thrown']);
+
+/** A stand-in weapon of a category, so each preset picks that category's look (JB2A swings by category) */
+function sampleWeapon(cat) {
+	return { type: cat === 'shield' ? 'shield' : 'weapon', name: '', system: { category: { value: cat === 'shield' ? 'brawling' : cat }, type: { value: RANGED_CATS.has(cat) ? 'ranged' : 'melee' } } };
+}
+
+/** "wpn:sword" for a sword, "wpn:shield" for a shield: the world entry every weapon of that kind falls back to */
+export function weaponKey(item) {
+	if (!item || !['weapon', 'customWeapon', 'shield'].includes(item.type)) return null;
+	if (item.type === 'shield') return 'wpn:shield';
+	const cat = v(item.system?.category);
+	return cat && WEAPON_CATEGORIES[cat] ? `wpn:${cat}` : null;
+}
+
 /** Built-in animation for a table key */
 export function defaultFor(key) {
 	if (!key) return null;
 	if (key.startsWith('bst:')) return BESTIARY[key.slice(4)]?.spec ?? null;
+	if (key.startsWith('wpn:')) return WEAPON_CATEGORIES[key.slice(4)] ? weaponSpec(sampleWeapon(key.slice(4))) : null;
 	return ABILITIES[key]?.spec ?? null;
 }
 
@@ -142,6 +217,10 @@ export function entryFor(key) {
 	if (key.startsWith('bst:')) {
 		const b = BESTIARY[key.slice(4)];
 		return b ? { name: b.name, group: `Bestiary: ${b.book}` } : null;
+	}
+	if (key.startsWith('wpn:')) {
+		const words = WEAPON_WORDS[key.slice(4)];
+		return words ? { name: words[0], group: 'Weapons' } : null;
 	}
 	const a = ABILITIES[key];
 	return a ? { name: a.name, group: a.group } : null;
@@ -232,6 +311,9 @@ export function resolveSpec(item, ctx = {}) {
 	const key = abilityKey(item);
 	const world = key ? worldOverrides()[key] : null;
 	if (world?.style) return { spec: world, source: 'world' };
+	const wk = weaponKey(item);
+	const kind = wk ? worldOverrides()[wk] : null;
+	if (kind?.style) return { spec: kind, source: 'category' };
 	const def = presetFor(key, { item, damageType: ctx.damageType });
 	if (def) return { spec: def, source: 'default' };
 	return { spec: inPreset(fallbackSpec(item, ctx), { item, damageType: ctx.damageType }), source: 'guess' };
@@ -248,7 +330,9 @@ export function inPreset(spec, ctx = {}) {
 /** The built-in animation for a table key in the active preset */
 export function presetFor(key, ctx = {}) {
 	const def = defaultFor(key);
-	return def ? inPreset(def, { ...ctx, key }) : null;
+	if (!def) return null;
+	const item = ctx.item ?? (key?.startsWith('wpn:') ? sampleWeapon(key.slice(4)) : undefined);
+	return inPreset(def, { ...ctx, item, key });
 }
 
 /** The table entry (or a guess) without any overrides, for "reset" */
@@ -268,7 +352,7 @@ export function describe(spec) {
 	if (spec.projectile) parts.push(PROJECTILES[spec.projectile]?.toLowerCase() ?? fxLabel(spec.projectile).toLowerCase());
 	if (spec.hit) parts.push(`${fxLabel(spec.hit)}${spec.style === 'self' ? '' : ' on target'}`);
 	if (spec.after) parts.push(`${fxLabel(spec.after)} back`);
-	if (spec.element && !['auto', 'none'].includes(spec.element)) parts.push(spec.element);
+	if (spec.element && !['auto', 'none'].includes(spec.element)) parts.push(isHexColor(spec.element) ? `color ${spec.element}` : spec.element);
 	if (spec.impact?.power) parts.push(`${spec.impact.power} impact`);
 	if (spec.impact?.cutin === 'on') parts.push('cut-in');
 	if (spec.castSound === 'none' && spec.hitSound === 'none') parts.push('silent');

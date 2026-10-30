@@ -2,6 +2,7 @@ import { ELEMENT_RAMPS, PIXEL, isPixel } from './pixelfx.mjs';
 import { now } from './clock.mjs';
 import { getLayer, userScale } from './player.mjs';
 import { bayer, hex, resample } from './sf/kit.mjs';
+import { ELEMENT_LOOK, isHexColor } from './presets.mjs';
 
 /**
  * Playing pixel effects (pixelfx.mjs) on the Foundry canvas.
@@ -103,6 +104,72 @@ function shapeOf(token, artPx) {
 	return out;
 }
 
+/**
+ * The art's lowest solid row: where the figure's feet are, so ground effects (explosions, strikes, spikes, puddles,
+ * rune circles, shield domes) start under the sprite and not halfway up its legs. Cached on the shape.
+ */
+function feetRow(shape) {
+	if (!shape?.data) return null;
+	if (shape.feet !== undefined) return shape.feet;
+	let feet = null;
+	for (let y = shape.h - 1; y >= 0 && feet == null; y--) {
+		let solid = 0;
+		for (let x = 0; x < shape.w; x++) if (shape.data[y * shape.w + x] >>> 24 > 96 && ++solid >= 2) break;
+		if (solid >= 2) feet = y;
+	}
+	shape.feet = feet;
+	return feet;
+}
+
+/** The art's highest solid row: the top of the figure's head. Cached on the shape. */
+function headRow(shape) {
+	if (!shape?.data) return null;
+	if (shape.head !== undefined) return shape.head;
+	let head = null;
+	for (let y = 0; y < shape.h && head == null; y++) {
+		let solid = 0;
+		for (let x = 0; x < shape.w; x++) if (shape.data[y * shape.w + x] >>> 24 > 96 && ++solid >= 2) break;
+		if (solid >= 2) head = y;
+	}
+	shape.head = head;
+	return head;
+}
+
+/**
+ * How far above and below its centre a token's figure reaches, in canvas pixels, from its art
+ * (status effects sit on the head and at the feet). Falls back to most of the token's square.
+ */
+export function tokenArtBox(token) {
+	const fallback = { top: -(token?.h ?? 100) * 0.42, bottom: (token?.h ?? 100) * 0.45 };
+	if (!token || token.destroyed || !canvas?.ready) return fallback;
+	try {
+		const artPx = canvas.grid.size / ART_PER_GRID;
+		const sh = shapeOf(token, artPx);
+		const f = feetRow(sh);
+		const h = headRow(sh);
+		if (f == null || h == null) return fallback;
+		return { top: (h - sh.h / 2) * artPx, bottom: (f + 1 - sh.h / 2) * artPx };
+	} catch {
+		return fallback;
+	}
+}
+
+/** Where a token's feet touch the ground on the map, from its art (scorch marks, warning circles) */
+export function tokenFeet(token) {
+	if (!token || token.destroyed || !canvas?.ready) return null;
+	const c = token.center;
+	const artPx = canvas.grid.size / ART_PER_GRID;
+	let f = null;
+	let sh = null;
+	try {
+		sh = shapeOf(token, artPx);
+		f = feetRow(sh);
+	} catch {
+		f = null;
+	}
+	return { x: c.x, y: f != null ? c.y + (f + 1 - sh.h / 2) * artPx : c.y + token.h * 0.45 };
+}
+
 /** The token at a point: the one passed along, else the one whose centre is there */
 function tokenAt(token, point) {
 	if (token && !token.destroyed) return token;
@@ -124,8 +191,16 @@ function tokenAt(token, point) {
 /*  Where an effect plays                                              */
 /* ------------------------------------------------------------------ */
 
+/** A pixel palette for a custom color, bright to dark: white, three tints, the color, three shades */
+function hexRampOf(hexStr) {
+	const n = parseInt(hexStr.slice(1), 16);
+	const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+	const mix = (to, k) => '#' + c.map((v) => Math.round(v + (to - v) * k).toString(16).padStart(2, '0')).join('');
+	return ['#ffffff', mix(255, 0.75), mix(255, 0.5), mix(255, 0.25), mix(255, 0), mix(0, 0.3), mix(0, 0.55), mix(0, 0.78)];
+}
+
 function rampOf(element) {
-	const r = ELEMENT_RAMPS[element];
+	const r = ELEMENT_RAMPS[element] ?? (isHexColor(element) ? hexRampOf(element) : null);
 	return { ramp: (n) => (r ? resample(r.map(hex), n) : undefined), hexRamp: (n) => (r ? resample(r, n) : undefined) };
 }
 
@@ -148,7 +223,10 @@ export function placement(o) {
 	const T = o.target ?? { w: ART_PER_GRID, h: ART_PER_GRID };
 	const S = o.source ?? T;
 	const hT = (T.h * PX) / 2;
-	const ground = y + hT * 0.62;
+	// feet: the art's lowest solid row when we could read the image, else near the bottom of the token
+	const tf = feetRow(T.shape);
+	const ground = tf != null ? y + (tf + 1 - T.shape.h / 2) * PX : y + hT * 0.9;
+	const sf = feetRow(S.shape);
 	const head = y - hT * 0.8;
 	const reach = (Math.max(S.w, S.h) * PX) / 2;
 	const hand = dist > 1 ? { x: fx + Math.cos(angle) * reach * 0.55, y: fy + Math.sin(angle) * reach * 0.55, a: angle } : { x: x + Math.cos(angle) * reach * 0.55, y: y + Math.sin(angle) * reach * 0.55, a: angle };
@@ -160,7 +238,7 @@ export function placement(o) {
 		silhouette: () => (shape ? { x: Math.round(x / PX - shape.w / 2), y: Math.round(y / PX - shape.h / 2), w: shape.w, h: shape.h, data: shape.data } : null),
 	};
 	const source = {
-		feet: () => [fx, fy + ((S.h * PX) / 2) * 0.62],
+		feet: () => [fx, sf != null ? fy + (sf + 1 - S.shape.h / 2) * PX : fy + ((S.h * PX) / 2) * 0.9],
 		head: () => [fx, fy - ((S.h * PX) / 2) * 0.8],
 		hand: () => hand,
 		silhouette: () => null,
@@ -359,7 +437,22 @@ const CMF = () => PIXI.ColorMatrixFilter ?? PIXI.filters?.ColorMatrixFilter;
 const HUE = { fire: 14, ice: 198, bolt: 52, air: 150, earth: 32, light: 48, dark: 272, poison: 96 };
 
 /** Effects that keep their own palette get hue-rotated toward the element instead */
+/** A custom color on an effect with its own palette: turn it to that hue, saturation and lightness */
+function customHueFilter(def, look) {
+	if (def.ramp || def.hue == null) return null; // palette effects already draw in the custom ramp
+	const Filter = CMF();
+	if (!Filter) return null;
+	const f = new Filter();
+	if (look.hue == null) f.saturate(-1, false);
+	else f.hue(look.hue - def.hue, false);
+	if (look.sat) f.saturate(look.sat, true);
+	if (look.bright) f.brightness(look.bright, true);
+	return f;
+}
+
 function hueFilter(def, element) {
+	const custom = isHexColor(element) ? ELEMENT_LOOK[element] : null;
+	if (custom) return customHueFilter(def, custom);
 	if (def.ramp || def.hue == null || !(element in HUE)) return null;
 	const Filter = CMF();
 	if (!Filter) return null;
@@ -399,7 +492,7 @@ export function playPixel(id, at) {
 			element: at.element,
 			seed: Math.floor(Math.random() * 1e6),
 			target: { ...size(tTok), shape: shapeOf(tTok, artPx) },
-			source: size(sTok),
+			source: from && sTok ? { ...size(sTok), shape: shapeOf(sTok, artPx) } : size(sTok),
 		});
 		const run = new PixelRun(id, P, { onHit: hitResolve });
 		const b = bounds(def, P);

@@ -1,4 +1,4 @@
-import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, FX, MODULE_ID, PRESETS, STYLES, abilityKey, activePreset, defaultSpec, describe, entryFor, fxGroups, presetFor, projectileGroups, resolveSpec, worldOverrides } from './presets.mjs';
+import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, FX, MODULE_ID, PRESETS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
 import { JBFX, isJb, jbModule } from './jbcore.mjs';
 import { resolveElement, runPlan } from './sequence.mjs';
 import { PROC, isProc } from './procedural.mjs';
@@ -16,6 +16,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 const SOURCE_TEXT = {
 	item: 'This item has its own animation.',
 	world: 'Using the world choice for this ability.',
+	category: 'Using the world choice for this kind of weapon.',
 	default: 'Using the built-in animation for this ability',
 	guess: 'Picked automatically from the item',
 };
@@ -237,6 +238,8 @@ export class AnimationEditor extends ApplicationV2 {
 		super({ ...options, id: `fua-editor-${key.replace(/[^a-zA-Z0-9-]/g, '-')}` });
 		this.item = target.item ?? null;
 		this.fuid = target.item ? abilityKey(target.item) : target.fuid;
+		/** a weapon's category entry ("wpn:sword"), for "every sword in this world" */
+		this.catKey = target.item ? weaponKey(target.item) : null;
 		const entry = entryFor(this.fuid);
 		this.name = this.item?.name ?? entry?.name ?? this.fuid;
 		if (this.item) {
@@ -248,7 +251,7 @@ export class AnimationEditor extends ApplicationV2 {
 			this.source = w ? 'world' : 'default';
 			this.spec = foundry.utils.deepClone(w ?? presetFor(this.fuid) ?? { style: 'none' });
 		}
-		this.scope = this.item ? (this.source === 'world' && game.user.isGM ? 'world' : 'item') : 'world';
+		this.scope = this.item ? (['world', 'category'].includes(this.source) && game.user.isGM ? this.source : 'item') : 'world';
 		this.previews = [];
 	}
 
@@ -289,7 +292,7 @@ export class AnimationEditor extends ApplicationV2 {
 				<label ${none || s.style === 'self' ? 'class="off"' : ''}><span>Projectile</span><select data-k="projectile">${projOptions(s.projectile)}</select></label>
 				<label ${none ? 'class="off"' : ''}><span>${s.style === 'self' ? 'On the user' : 'On each target'}</span><select data-k="hit">${fxOptions(s.hit)}</select></label>
 				<label ${none ? 'class="off"' : ''}><span>Back on the user after</span><select data-k="after">${fxOptions(s.after)}</select></label>
-				<label ${none ? 'class="off"' : ''}><span>Color</span><select data-k="element">${opts(ELEMENTS, s.element ?? 'auto')}</select></label>
+				<div class="snd colorpick ${none ? 'off' : ''}"><span>Color</span><div class="row"><select data-k="element" aria-label="Color">${opts({ ...ELEMENTS, custom: 'Custom color…' }, isHexColor(s.element) ? 'custom' : (s.element ?? 'auto'))}</select>${isHexColor(s.element) ? `<input type="color" data-k="elementColor" value="${esc(s.element)}" aria-label="Custom color" data-tooltip="Any color: recolors this animation in every preset, JB2A Free included">` : ''}</div></div>
 				<label ${none ? 'class="off"' : ''}><span>Size <output>${Number(s.scale ?? 1).toFixed(1)}×</output></span><input type="range" data-k="scale" min="0.5" max="2.5" step="0.1" value="${s.scale ?? 1}"></label>
 				<div class="snd ${none ? 'off' : ''}"><span>Sound on use</span><div class="row"><select data-k="castSound">${this.#soundOptions(s.castSound, auto.cast ?? auto.projectile)}</select><button type="button" class="play" data-action="playSound" data-which="cast" aria-label="Play the use sound" data-tooltip="Play">▶</button></div></div>
 				<div class="snd ${none ? 'off' : ''}"><span>Sound on hit</span><div class="row"><select data-k="hitSound">${this.#soundOptions(s.hitSound, auto.hit)}</select><button type="button" class="play" data-action="playSound" data-which="hit" aria-label="Play the hit sound" data-tooltip="Play">▶</button></div></div>
@@ -305,8 +308,13 @@ export class AnimationEditor extends ApplicationV2 {
 					? `<fieldset class="scope"><legend>Save for</legend>
 				<label><input type="radio" name="scope" value="item" ${this.scope === 'item' ? 'checked' : ''}> This item only</label>
 				${canWorld ? `<label><input type="radio" name="scope" value="world" ${this.scope === 'world' ? 'checked' : ''}> Every “${esc(this.name)}” in this world</label>` : ''}
+				${game.user.isGM && this.catKey ? `<label><input type="radio" name="scope" value="category" ${this.scope === 'category' ? 'checked' : ''}> Every ${esc(weaponOne(this.catKey))} in this world</label>` : ''}
 			</fieldset>`
-					: `<p class="note">Applies to every character and NPC with ${esc(this.name)}, unless one of their items has its own animation.</p>`
+					: `<p class="note">${
+							this.fuid?.startsWith('wpn:')
+								? `Applies to every ${esc(weaponOne(this.fuid))} in this world, unless that weapon has its own animation (or one set for its name).`
+								: `Applies to every character and NPC with ${esc(this.name)}, unless one of their items has its own animation.`
+						}</p>`
 			}
 			<footer>
 				<button type="button" data-action="preview" data-tooltip="Plays from your selected token at your targets">Preview on the scene</button>
@@ -414,9 +422,16 @@ export class AnimationEditor extends ApplicationV2 {
 		}
 		this.#syncPreviews();
 		root.querySelectorAll('[data-k]').forEach((el) =>
-			el.addEventListener(el.type === 'range' ? 'input' : 'change', () => {
-				const k = el.dataset.k;
+			el.addEventListener(['range', 'color'].includes(el.type) ? 'input' : 'change', () => {
+				let k = el.dataset.k;
 				let val = el.value;
+				// custom color: the picker's hex code is the "element" every recolor reads
+				if (k === 'element' && val === 'custom') val = this.#customStart();
+				if (k === 'elementColor') {
+					k = 'element';
+					this.spec.element = val;
+					return this.#syncPreviews();
+				}
 				if (k === 'scale') {
 					val = Number(val);
 					el.closest('label').querySelector('output').textContent = `${val.toFixed(1)}×`;
@@ -443,6 +458,13 @@ export class AnimationEditor extends ApplicationV2 {
 		root.querySelectorAll('input[name="scope"]').forEach((el) => el.addEventListener('change', () => (this.scope = el.value)));
 	}
 
+	/** Where the color picker starts: the color the animation shows now */
+	#customStart() {
+		const el = this.previewElement;
+		const look = ELEMENT_LOOK[el] ?? ELEMENT_LOOK.none;
+		return `#${(el === 'none' || el === 'auto' ? 0xff4fa3 : look.color).toString(16).padStart(6, '0')}`;
+	}
+
 	#syncPreviews() {
 		const el = this.previewElement;
 		for (const p of this.previews) {
@@ -463,6 +485,12 @@ export class AnimationEditor extends ApplicationV2 {
 		if (this.item && this.scope === 'item') {
 			await this.item.setFlag(MODULE_ID, 'spec', spec);
 			ui.notifications.info(`Animation saved for this ${this.name}.`);
+		} else if (this.item && this.scope === 'category' && this.catKey) {
+			const all = foundry.utils.deepClone(worldOverrides());
+			all[this.catKey] = spec;
+			await game.settings.set(MODULE_ID, 'overrides', all);
+			if (this.item.getFlag(MODULE_ID, 'spec')) await this.item.unsetFlag(MODULE_ID, 'spec');
+			ui.notifications.info(`Animation saved for every ${weaponOne(this.catKey)}.`);
 		} else {
 			const all = foundry.utils.deepClone(worldOverrides());
 			all[this.fuid] = spec;
@@ -477,6 +505,15 @@ export class AnimationEditor extends ApplicationV2 {
 	static async #onReset() {
 		if (this.item && this.scope === 'item') {
 			if (this.item.getFlag(MODULE_ID, 'spec')) await this.item.unsetFlag(MODULE_ID, 'spec');
+			const r = resolveSpec(this.item);
+			this.source = r.source;
+			this.spec = foundry.utils.deepClone(r.spec);
+		} else if (this.item && this.scope === 'category' && this.catKey) {
+			const all = foundry.utils.deepClone(worldOverrides());
+			if (this.catKey in all) {
+				delete all[this.catKey];
+				await game.settings.set(MODULE_ID, 'overrides', all);
+			}
 			const r = resolveSpec(this.item);
 			this.source = r.source;
 			this.spec = foundry.utils.deepClone(r.spec);
@@ -534,7 +571,13 @@ export class AnimationLibrary extends ApplicationV2 {
 		const groups = {};
 		for (const [fuid, a] of Object.entries(ABILITIES)) (groups[a.group] ??= []).push([fuid, a]);
 		for (const [key, b] of Object.entries(BESTIARY)) (groups[`Bestiary: ${b.book}`] ??= []).push([`bst:${key}`, { ...b, kindLabel: key.split(':')[0] }]);
-		const order = Object.keys(groups).sort((a, b) => a.startsWith('Bestiary') - b.startsWith('Bestiary') || (a === 'Heroic Skills') - (b === 'Heroic Skills') || (a === 'NPC Spells') - (b === 'NPC Spells') || (a === 'Items') - (b === 'Items') || a.localeCompare(b));
+		// one entry per kind of weapon: every sword, every bow... unless a weapon has its own
+		for (const cat of Object.keys(WEAPON_CATEGORIES)) {
+			const key = `wpn:${cat}`;
+			(groups.Weapons ??= []).push([key, { name: entryFor(key).name, spec: defaultFor(key) }]);
+		}
+		const late = (g) => (g.startsWith('Bestiary') ? 5 : g === 'Heroic Skills' ? 4 : g === 'NPC Spells' ? 3 : g === 'Weapons' ? 2 : g === 'Items' ? 1 : 0);
+		const order = Object.keys(groups).sort((a, b) => late(a) - late(b) || a.localeCompare(b));
 		const body = order
 			.map((g) => {
 				const rows = groups[g]
@@ -559,7 +602,7 @@ export class AnimationLibrary extends ApplicationV2 {
 				<input type="search" placeholder="Search abilities, classes or effects" aria-label="Search">
 				<label><input type="checkbox" data-hide-none> Hide abilities with no animation</label>
 			</div>
-			<p class="note">NPC attacks and spells from the bestiaries match by name, so an NPC you build with a book attack's name gets its animation. Weapons and any other NPC attack pick one from the weapon category and damage type. Change a single item from the Animation button in its sheet's header.</p>
+			<p class="note">NPC attacks and spells from the bestiaries match by name, so an NPC you build with a book attack's name gets its animation. Weapons pick one from their category and damage type; set one for every weapon of a kind under Weapons. Any other NPC attack is guessed from its name and damage type. Change a single item from the Animation button in its sheet's header.</p>
 			<div class="list">${body}</div>`;
 		return div;
 	}
