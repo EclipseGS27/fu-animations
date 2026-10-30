@@ -5,6 +5,8 @@
  * keep their original drawing. A few abilities get hand-picked JB2A animations on top.
  */
 
+import { pixelSoundAs } from './pixelmap.mjs';
+
 const v = (x) => (x && typeof x === 'object' && 'value' in x ? x.value : x);
 
 /* ------------------------------------------------------------------ */
@@ -514,7 +516,11 @@ for (const jb of Object.values(EL_SIGN)) SOUND_AS[jb] ??= 'cast-glow-3';
 export function soundView(spec) {
 	if (!spec) return spec;
 	const out = { ...spec };
-	for (const k of ['cast', 'hit', 'after']) if (out[k]?.startsWith?.('jb-')) out[k] = SOUND_AS[out[k]] ?? (k === 'cast' ? 'cast-glow-3' : 'impact-flash-2');
+	for (const k of ['cast', 'hit', 'after']) {
+		if (out[k]?.startsWith?.('jb-')) out[k] = SOUND_AS[out[k]] ?? (k === 'cast' ? 'cast-glow-3' : 'impact-flash-2');
+		else if (out[k]?.startsWith?.('sf-')) out[k] = pixelSoundAs(out[k], k);
+	}
 	if (out.projectile?.startsWith?.('jb-')) out.projectile = PROJ_AS[out.projectile] ?? (/beam|ray|strands|conduit|disintegrate|witch|chain/.test(out.projectile) ? 'beam' : 'orb');
+	else if (out.projectile?.startsWith?.('sf-')) out.projectile = pixelSoundAs(out.projectile, 'projectile');
 	return out;
 }

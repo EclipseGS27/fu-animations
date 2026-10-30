@@ -2,6 +2,7 @@ import { ELEMENT_LOOK, FX, MODULE_ID, getSetting } from './presets.mjs';
 import { PROC, isProc } from './procedural.mjs';
 import { now, wait } from './clock.mjs';
 import { isJb, jbDuration, playJb, preloadJb } from './jb2a.mjs';
+import { isPixel, pixelDuration, playPixel } from './pixel.mjs';
 
 /**
  * Canvas side: sprite effects, projectiles, and visual-only token motion (lunges, knockback, dodges, idle hover).
@@ -110,6 +111,7 @@ export function userScale() {
 export async function playFx(id, at) {
 	if (isProc(id)) return playProc(id, at);
 	if (isJb(id)) return playJb(id, at);
+	if (isPixel(id)) return playPixel(id, at);
 	const fx = FX[id];
 	if (!fx || !canvas?.ready) return;
 	const frames = await framesOf(id);
@@ -199,6 +201,7 @@ export function playProc(id, at) {
 export function fxDuration(id) {
 	if (isProc(id)) return PROC[id].dur;
 	if (isJb(id)) return jbDuration(id);
+	if (isPixel(id)) return pixelDuration(id);
 	const fx = FX[id];
 	return fx ? (fx.frames / fx.fps) * 1000 * (fx.loop ? 2 : 1) : 0;
 }
