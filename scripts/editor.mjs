@@ -6,6 +6,7 @@ import { IMPACT_FIELDS, autoText, feelOf } from './feel.mjs';
 import { cutIn } from './impact.mjs';
 import { PIXEL, PixelPreview, isPixel, pixelDuration } from './pixel.mjs';
 import { ELEMENT_HIT, ZERO_EFFECTS, ZERO_STAGES, stageField, stageOf, zeroKeyOf, zeroTypesOf } from './zero.mjs';
+import { BOSS_MOVES, bossMoveOf } from './boss.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -292,6 +293,7 @@ export class AnimationEditor extends ApplicationV2 {
 				<div class="fld"><span>Sound on use</span><div class="in"><select data-k="castSound">${this.#soundOptions(s.castSound, auto.cast ?? auto.projectile)}</select><button type="button" class="play" data-action="playSound" data-which="cast" aria-label="Play the use sound" data-tooltip="Play">▶</button></div></div>
 				<div class="fld"><span>Sound on hit</span><div class="in"><select data-k="hitSound">${this.#soundOptions(s.hitSound, auto.hit)}</select><button type="button" class="play" data-action="playSound" data-which="hit" aria-label="Play the hit sound" data-tooltip="Play">▶</button></div></div>
 			</div>
+			${this.#bossHTML()}
 			${this.#impactHTML()}`
 			}
 			${
@@ -425,6 +427,15 @@ export class AnimationEditor extends ApplicationV2 {
 		this.render();
 	}
 
+	/** Boss move: the signature scene champions and villains play with this (Automatic picks it from the item) */
+	#bossHTML() {
+		if (this.#zeroKey()) return '';
+		const auto = bossMoveOf({ spec: { ...this.spec, bossMove: undefined }, element: this.spec.element, offensive: ['melee', 'ranged', 'spell'].includes(this.spec.style) }, this.item ?? { name: this.name });
+		const cur = this.spec.bossMove ?? '';
+		const opt = (v, l) => `<option value="${v}" ${cur === v ? 'selected' : ''} ${v && BOSS_MOVES[v] ? `title="${esc(BOSS_MOVES[v].desc)}"` : ''}>${esc(l)}</option>`;
+		return `<div class="row boss"><label class="fld"><span>Boss move <small>when a champion or villain uses it</small></span><select data-k="bossMove">${opt('', `Automatic: ${BOSS_MOVES[auto]?.label ?? 'none'}`)}${opt('none', 'No boss move')}${Object.entries(BOSS_MOVES).map(([k, m]) => opt(k, m.label)).join('')}</select></label>${cur && BOSS_MOVES[cur] ? `<p class="hint">${esc(BOSS_MOVES[cur].desc)}</p>` : ''}</div>`;
+	}
+
 	#impactHTML() {
 		const imp = this.spec.impact ?? {};
 		// auto text for each field comes from the level actually chosen, so "Automatic: Long" follows Heroic
@@ -544,7 +555,7 @@ export class AnimationEditor extends ApplicationV2 {
 				}
 				if (val === '' || val == null) delete this.spec[k];
 				else this.spec[k] = val;
-				if (['style', 'cast', 'hit', 'projectile', 'element', 'zero'].includes(k)) return this.render();
+				if (['style', 'cast', 'hit', 'projectile', 'element', 'zero', 'bossMove'].includes(k)) return this.render();
 				if (['castSound', 'hitSound'].includes(k) && val) playSound(val);
 				this.#syncPreviews();
 			}),

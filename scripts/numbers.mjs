@@ -139,13 +139,15 @@ async function hookDamageEvents() {
 	}
 }
 
-/** The system's own "-12 HP" floating text would double up with ours */
+/** The system's own "-12 HP" and "Miss" floating text would double up with ours (the MISS is drawn as the target dodges) */
 function muteSystemText() {
 	const iface = canvas?.interface;
 	if (!iface?.createScrollingText || iface.createScrollingText.fuaWrapped) return;
 	const orig = iface.createScrollingText;
+	const miss = (game.i18n?.localize?.('FU.Miss') || 'Miss').trim().toLowerCase();
 	const wrapped = function (origin, text, options) {
-		if (numbersOn() && typeof text === 'string' && /^[-+]?\d+\s*hp$/i.test(text.trim())) return Promise.resolve();
+		const t = typeof text === 'string' ? text.trim() : '';
+		if (numbersOn() && (/^[-+]?\d+\s*hp$/i.test(t) || t.toLowerCase() === miss || t.toLowerCase() === 'miss')) return Promise.resolve();
 		return orig.call(this, origin, text, options);
 	};
 	wrapped.fuaWrapped = true;

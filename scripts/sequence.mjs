@@ -8,6 +8,7 @@ import { isJb, playJb } from './jb2a.mjs';
 import { isPixel, playPixel, tokenFeet } from './pixel.mjs';
 import { PIXEL_CRIT } from './pixelmap.mjs';
 import { ZERO_EFFECTS, playZero, zeroKeyOf, zeroTypesOf } from './zero.mjs';
+import { BOSS_MOVES, bossMoveOf, playBossMove } from './boss.mjs';
 
 /**
  * Turning a chat card into an animation plan (on the client that rolled it), and playing a plan (on every client).
@@ -95,6 +96,7 @@ export function planFromMessage(msg) {
 		zero: itemKind(item) === 'zeroPower' ? zeroKeyOf(item) : null,
 		zeroTypes: itemKind(item) === 'zeroPower' ? zeroTypesOf(item) : [],
 		boss: bossOf(src.actor),
+		bossMove: bossOf(src.actor) ? bossMoveOf({ spec, element: resolveElement(spec, damageType, item), offensive: offensive || ['melee', 'ranged', 'spell'].includes(spec.style) }, item) : null,
 		user: src.document?.name ?? src.actor?.name ?? '',
 		portrait: src.actor?.img ?? src.document?.texture?.src ?? null,
 	};
@@ -341,6 +343,20 @@ async function finale(plan, F, src, targets, snd) {
 }
 
 /**
+ * The boss move to play, if any: champions and villains, on their big moves (spells, abilities, heroic hits,
+ * critical hits), or on every action, by the "Boss moves" setting. An item set to a boss move always plays it.
+ */
+function bossMoveFor(plan, F) {
+	if (!F.boss || !plan.bossMove || !BOSS_MOVES[plan.bossMove]) return null;
+	const mode = getSetting('bossMoves') ?? 'big';
+	if (mode === 'off') return null;
+	const chosen = plan.spec?.bossMove && plan.spec.bossMove !== 'auto';
+	if (chosen || mode === 'all') return plan.bossMove;
+	const big = F.level === 'heroic' || plan.crit || ['spell', 'miscAbility', 'rule'].includes(plan.itemType) || !plan.offensive;
+	return big ? plan.bossMove : null;
+}
+
+/**
  * Play a plan on this client's canvas.
  * @param {object} plan from planFromMessage (or the editor preview)
  */
@@ -373,6 +389,9 @@ export async function runPlan(plan) {
 			const mid = { x: cs.reduce((s, c) => s + c.x, 0) / cs.length, y: cs.reduce((s, c) => s + c.y, 0) / cs.length };
 			I.cameraPush(mid, { zoom: F.camera, inMs: 380, hold: 1500, outMs: 600 });
 		}
+		// a champion's or villain's big moves play as a boss move: their signature scene
+		const move = bossMoveFor(plan, F);
+		if (move && (await playBossMove(move, { plan, src, targets }))) return;
 		await perform(plan, F, src, targets, snd);
 		if (F.boss && F.level === 'heroic') await Promise.all(targets.map((t) => I.shockwaves(center(t.token), { color: 0xff3b4e, size: 1.2 * Math.min(2, sizeOf(t.token)), count: 2 })));
 		if (undim) await wait(F.level === 'heroic' ? 380 : 260);
