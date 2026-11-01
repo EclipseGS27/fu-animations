@@ -800,4 +800,197 @@ export async function menace(token, { color = 0xff3b4e, ms = 520 } = {}) {
 	};
 }
 
+/* ------------------------------------------------------------------ */
+/*  Zero Power pieces                                                  */
+/* ------------------------------------------------------------------ */
+
+/** A dome of light rising over a point: an ellipse with a hex lattice that shimmers, then fades */
+export function dome(at, { radius = 3, color = 0x7fe0ff, ms = 1600 } = {}) {
+	const { fxLayer: L } = layers();
+	const gr = new PIXI.Graphics();
+	gr.blendMode = PIXI.BLEND_MODES.ADD;
+	L.addChild(gr);
+	const R = g() * radius;
+	return run(ms, (t) => {
+		gr.clear();
+		const grow = ease.out(Math.min(1, t * 2.2));
+		const fade = t < 0.75 ? 1 : 1 - (t - 0.75) / 0.25;
+		const r = R * grow;
+		gr.beginFill(color, 0.1 * fade).drawEllipse(at.x, at.y, r, r * 0.62).endFill();
+		gr.lineStyle(g() * 0.06, color, 0.9 * fade).drawEllipse(at.x, at.y, r, r * 0.62);
+		// hexagons inside the dome, lit by a sweeping band
+		const hx = g() * 0.42;
+		const sweep = -R + t * R * 3;
+		for (let y = -r * 0.62; y <= r * 0.62; y += hx * 1.5) {
+			for (let x = -r; x <= r; x += hx * 1.73) {
+				const ox = x + ((Math.round(y / (hx * 1.5)) & 1) * hx * 0.865);
+				if ((ox * ox) / (r * r) + (y * y) / (r * 0.62 * r * 0.62) > 0.92) continue;
+				const lit = Math.max(0, 1 - Math.abs(ox + y - sweep) / (g() * 1.2));
+				gr.lineStyle(g() * 0.018, color, (0.18 + 0.6 * lit) * fade);
+				for (let k = 0; k <= 6; k++) {
+					const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
+					const px = at.x + ox + Math.cos(a) * hx * 0.5;
+					const py = at.y + y + Math.sin(a) * hx * 0.5 * 0.62;
+					k ? gr.lineTo(px, py) : gr.moveTo(px, py);
+				}
+			}
+		}
+	}).then(() => gr.destroy());
+}
+
+/** A column of light falling from above onto a point */
+export function beamDown(at, { color = 0xfff0b0, width = 0.7, ms = 900 } = {}) {
+	const { fxLayer: L } = layers();
+	const gr = new PIXI.Graphics();
+	gr.blendMode = PIXI.BLEND_MODES.ADD;
+	L.addChild(gr);
+	const top = at.y - g() * 9;
+	return run(ms, (t) => {
+		gr.clear();
+		const drop = ease.in(Math.min(1, t * 3));
+		const fade = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
+		const y1 = top + (at.y - top) * drop;
+		for (let i = 3; i >= 0; i--) {
+			const w = g() * width * (1 + i * 0.6) * (0.6 + 0.4 * Math.sin(t * 40 + i));
+			gr.beginFill(i ? color : 0xffffff, (i ? 0.12 : 0.55) * fade).drawRect(at.x - w / 2, top, w, y1 - top).endFill();
+		}
+		if (drop >= 1) gr.beginFill(0xffffff, 0.5 * fade).drawEllipse(at.x, at.y, g() * width * 1.6, g() * width * 0.6).endFill();
+	}).then(() => gr.destroy());
+}
+
+/** Glowing lines drawn between points (a triangle, a constellation), then fading */
+export function linkLines(points, { color = 0xffffff, ms = 1200, closed = true } = {}) {
+	const { fxLayer: L } = layers();
+	const gr = new PIXI.Graphics();
+	gr.blendMode = PIXI.BLEND_MODES.ADD;
+	L.addChild(gr);
+	const segs = points.map((p, i) => [p, points[(i + 1) % points.length]]).slice(0, closed ? points.length : points.length - 1);
+	return run(ms, (t) => {
+		gr.clear();
+		const draw = Math.min(1, t * 2.5);
+		const fade = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
+		segs.forEach(([a, b], i) => {
+			const k = Math.max(0, Math.min(1, draw * segs.length - i));
+			if (!k) return;
+			const x = a.x + (b.x - a.x) * k;
+			const y = a.y + (b.y - a.y) * k;
+			gr.lineStyle(g() * 0.16, color, 0.25 * fade).moveTo(a.x, a.y).lineTo(x, y);
+			gr.lineStyle(g() * 0.05, 0xffffff, 0.9 * fade).moveTo(a.x, a.y).lineTo(x, y);
+		});
+		for (const p of points) gr.beginFill(color, 0.6 * fade).drawCircle(p.x, p.y, g() * 0.18 * (1 + 0.2 * Math.sin(t * 30))).endFill();
+	}).then(() => gr.destroy());
+}
+
+/** Orbs circling a token, faster and tighter, in the given colors */
+export function orbit(token, colors = [0xffffff], { ms = 1400, count = 6 } = {}) {
+	const { fxLayer: L } = layers();
+	const gr = new PIXI.Graphics();
+	gr.blendMode = PIXI.BLEND_MODES.ADD;
+	L.addChild(gr);
+	const c = center(token);
+	const R0 = Math.max(token.w ?? g(), token.h ?? g()) * 0.9;
+	return run(ms, (t) => {
+		gr.clear();
+		const spin = t * t * 18;
+		const r = R0 * (1.2 - 0.6 * ease.in(t));
+		for (let i = 0; i < count; i++) {
+			const a = spin + (i / count) * Math.PI * 2;
+			const col = colors[i % colors.length];
+			const x = c.x + Math.cos(a) * r;
+			const y = c.y + Math.sin(a) * r * 0.55;
+			for (let k = 4; k >= 0; k--) {
+				const ta = a - k * 0.12;
+				gr.beginFill(k ? col : 0xffffff, (k ? 0.18 : 0.9) * (1 - k * 0.15)).drawCircle(c.x + Math.cos(ta) * r, c.y + Math.sin(ta) * r * 0.55, g() * (0.16 - k * 0.02)).endFill();
+			}
+			void x;
+			void y;
+		}
+	}).then(() => gr.destroy());
+}
+
+/** Grow a token for a moment (transformation), then settle back */
+export async function pulseScale(token, k = 1.25, ms = 700) {
+	const mesh = token?.mesh;
+	if (!mesh) return;
+	const sx = mesh.scale.x;
+	const sy = mesh.scale.y;
+	await run(ms, (t) => {
+		const f = 1 + (k - 1) * Math.sin(Math.PI * t);
+		mesh.scale.set(sx * f, sy * f);
+	});
+	mesh.scale.set(sx, sy);
+}
+
+/** Soft feathers or petals drifting down over points */
+export async function feathers(points, { color = 0xfff6dc, ms = 1600 } = {}) {
+	const n = Math.round(ms / 140);
+	for (let i = 0; i < n; i++) {
+		for (const p of points) debris({ x: p.x + rand(-1.2, 1.2) * g(), y: p.y - g() * rand(1.2, 2.2) }, { color, count: 2, power: 0.15, kind: 'ember', dir: Math.PI / 2 });
+		await wait(140);
+	}
+}
+
+/** Words rising from a token, one after another (DEX, INS, MIG, WLP) */
+export async function risingWords(token, words, { color = 0xffd27a, gap = 180 } = {}) {
+	const { numLayer: L } = layers();
+	const c = center(token);
+	const jobs = [];
+	words.forEach((w, i) => {
+		jobs.push(
+			wait(i * gap).then(() => {
+				const tx = new PIXI.Text(w, { fontFamily: 'FBUI Antonio, Antonio, Arial Narrow, sans-serif', fontSize: Math.round(g() * 0.34), fontWeight: '700', fill: 0xffffff, stroke: color, strokeThickness: Math.max(3, g() * 0.06), dropShadow: true, dropShadowColor: color, dropShadowBlur: 10, dropShadowDistance: 0 });
+				tx.anchor.set(0.5);
+				const x0 = c.x + (i - (words.length - 1) / 2) * g() * 0.95;
+				tx.position.set(x0, c.y);
+				L.addChild(tx);
+				return run(1100, (t) => {
+					tx.position.set(x0, c.y - g() * (0.4 + 1.3 * ease.out(t)));
+					tx.alpha = t < 0.7 ? Math.min(1, t * 5) : 1 - (t - 0.7) / 0.3;
+					tx.scale.set(1 + 0.3 * (1 - Math.min(1, t * 4)));
+				}).then(() => tx.destroy());
+			}),
+		);
+	});
+	return Promise.all(jobs);
+}
+
+const domOverlay = (cls, color) => {
+	const el = document.createElement('div');
+	el.className = `fua-zero ${cls}`;
+	el.style.setProperty('--c', color);
+	document.body.appendChild(el);
+	return el;
+};
+
+/** Three big dice tumbling across the screen and landing. Resolves with the faces */
+export function diceRoll({ color = '#b07cff', ms = 1700 } = {}) {
+	if (getSetting('cutins') === false) return Promise.resolve([1, 2, 3].map(() => 1 + Math.floor(Math.random() * 6)));
+	const faces = [0, 1, 2].map(() => 1 + Math.floor(Math.random() * 6));
+	const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+	const el = domOverlay('dice', color);
+	el.innerHTML = faces.map((f, i) => `<div class="die" style="--i:${i}"><div class="face">${Array.from({ length: 9 }, (_, k) => `<i class="${PIPS[f].includes(k) ? 'on' : ''}"></i>`).join('')}</div></div>`).join('');
+	return new Promise((resolve) => {
+		setTimeout(() => el.classList.add('out'), ms - 300);
+		setTimeout(() => {
+			el.remove();
+			resolve(faces);
+		}, ms);
+	});
+}
+
+/** A giant clock whose sections fill (or empty), with its hand spinning */
+export function clockSpin({ color = '#4fd8d0', sections = 6, fill = 3, erase = false, ms = 1700 } = {}) {
+	if (getSetting('cutins') === false) return Promise.resolve();
+	const el = domOverlay('clock', color);
+	const seg = 360 / sections;
+	el.innerHTML = `<div class="face">${Array.from({ length: sections }, (_, i) => `<b style="--a:${i * seg}deg;--s:${seg}deg;--d:${(erase ? sections - 1 - i : i) * 0.16}s" class="${erase ? (i >= sections - fill ? 'was' : 'on') : i < fill ? 'fill' : ''}"></b>`).join('')}<i class="hand"></i><i class="hub"></i></div>`;
+	return new Promise((resolve) => {
+		setTimeout(() => el.classList.add('out'), ms - 300);
+		setTimeout(() => {
+			el.remove();
+			resolve();
+		}, ms);
+	});
+}
+
 export { colorOf };

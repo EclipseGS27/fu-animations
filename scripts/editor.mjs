@@ -5,6 +5,7 @@ import { autoSounds, playSound, soundGroups, soundLabel } from './audio.mjs';
 import { IMPACT_FIELDS, autoText, feelOf } from './feel.mjs';
 import { cutIn } from './impact.mjs';
 import { PIXEL, PixelPreview, isPixel, pixelDuration } from './pixel.mjs';
+import { ZERO_EFFECTS, zeroKeyOf, zeroTypesOf } from './zero.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -344,6 +345,16 @@ export class AnimationEditor extends ApplicationV2 {
 		return feelOf({ spec: { ...this.spec, ...over }, offensive, element: this.previewElement, itemType: itemKind(this.item) ?? (this.fuid && ABILITIES[this.fuid]?.group === 'Heroic Skills' ? 'heroic' : null), crit: false, targets: [{}] }, { targets: 1, ignoreSettings: true, ignoreBoss: true });
 	}
 
+	/** Which limit-break scene plays: read from the Zero Power, one of the eleven, or the general one */
+	#zeroHTML() {
+		const found = this.item ? zeroKeyOf(this.item) : null;
+		const cur = this.spec.zero ?? 'auto';
+		const o = (v, l) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
+		return `<label class="zero"><span>Limit break scene</span><select data-k="zero">${o('auto', `Automatic: ${found ? ZERO_EFFECTS[found].label : 'general limit break'}`)}${Object.entries(ZERO_EFFECTS)
+			.map(([k, z]) => o(k, z.label))
+			.join('')}${o('generic', 'General limit break (uses the effects above)')}</select></label>`;
+	}
+
 	#impactHTML() {
 		const imp = this.spec.impact ?? {};
 		// auto text for each field comes from the level actually chosen, so "Automatic: Long" follows Heroic
@@ -368,6 +379,7 @@ export class AnimationEditor extends ApplicationV2 {
 				${field('camera')}${field('dim')}${field('windup')}
 				${field('debris')}${field('scorch')}${field('cutin')}
 			</div>
+			${f.level === 'ultimate' || f.base === 'ultimate' ? this.#zeroHTML() : ''}
 			<div class="cutin ${showCut ? '' : 'off'}">
 				<label class="wide"><span>Cut-in title</span><input type="text" data-k="cutinText" value="${esc(this.spec.cutinText ?? '')}" placeholder="${esc(this.name)}"></label>
 				<label><span>Color</span><input type="color" data-k="cutinColor" value="${esc(color)}"></label>
@@ -454,7 +466,7 @@ export class AnimationEditor extends ApplicationV2 {
 				}
 				if (val === '' || val == null) delete this.spec[k];
 				else this.spec[k] = val;
-				if (['style', 'cast', 'hit', 'projectile', 'element'].includes(k)) return this.render();
+				if (['style', 'cast', 'hit', 'projectile', 'element', 'zero'].includes(k)) return this.render();
 				if (['castSound', 'hitSound'].includes(k) && val) playSound(val);
 				this.#syncPreviews();
 			}),
@@ -567,6 +579,8 @@ export class AnimationEditor extends ApplicationV2 {
 			crit: !!this.previewCrit,
 			name: this.name,
 			itemType: itemKind(this.item) ?? (ABILITIES[this.fuid]?.group === 'Heroic Skills' ? 'heroic' : null),
+			zero: this.item ? zeroKeyOf(this.item) : null,
+			zeroTypes: this.item ? zeroTypesOf(this.item) : [],
 			boss: bossOf(src.actor),
 			user: src.document?.name ?? src.actor?.name ?? '',
 			portrait: src.actor?.img ?? null,

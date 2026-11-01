@@ -7,6 +7,7 @@ import * as I from './impact.mjs';
 import { isJb, playJb } from './jb2a.mjs';
 import { isPixel, playPixel, tokenFeet } from './pixel.mjs';
 import { PIXEL_CRIT } from './pixelmap.mjs';
+import { ZERO_EFFECTS, playZero, zeroKeyOf, zeroTypesOf } from './zero.mjs';
 
 /**
  * Turning a chat card into an animation plan (on the client that rolled it), and playing a plan (on every client).
@@ -91,6 +92,8 @@ export function planFromMessage(msg) {
 		fumble: !!check?.fumble,
 		name: item.name,
 		itemType: itemKind(item),
+		zero: itemKind(item) === 'zeroPower' ? zeroKeyOf(item) : null,
+		zeroTypes: itemKind(item) === 'zeroPower' ? zeroTypesOf(item) : [],
 		boss: bossOf(src.actor),
 		user: src.document?.name ?? src.actor?.name ?? '',
 		portrait: src.actor?.img ?? src.document?.texture?.src ?? null,
@@ -264,13 +267,24 @@ async function approach(plan, F, src, main) {
 	return { back: () => tweenOffset(src, { x: 0, y: 0 }, Math.min(420, 200 + travel * 0.4), ease.inOut), ux, uy };
 }
 
+/** Which Zero Power scene plays: the one chosen in the editor, else the one read from the item */
+function zeroKey(plan) {
+	const pick = plan.spec?.zero;
+	if (pick === 'generic') return null;
+	if (pick && pick !== 'auto' && ZERO_EFFECTS[pick]) return pick;
+	return plan.zero && ZERO_EFFECTS[plan.zero] ? plan.zero : null;
+}
+
 /** Banner before a big move */
 function cutInFor(plan, F) {
 	if (!F.cutin) return Promise.resolve();
 	const spec = plan.spec;
 	const color = spec.cutinColor || (F.boss && !F.ultimate ? '#ff4d5e' : hex(F.color === 0xffd9a0 ? 0xf2c45a : F.color));
 	const base = { name: spec.cutinText || plan.name || '', user: plan.user ?? '', img: spec.cutinImg || plan.portrait, color };
-	if (F.ultimate) return I.cutIn({ ...base, kind: 'limit', kicker: plan.itemType === 'zeroPower' ? 'Zero Power' : 'Limit Break', ms: 1900 });
+	if (F.ultimate) {
+		const z = ZERO_EFFECTS[zeroKey(plan)];
+		return I.cutIn({ ...base, color: spec.cutinColor || (z ? hex(z.color) : base.color), kind: 'limit', kicker: z ? z.label : plan.itemType === 'zeroPower' ? 'Zero Power' : 'Limit Break', ms: 1900 });
+	}
 	if (F.boss) return I.cutIn({ ...base, kind: 'boss', kicker: plan.boss?.villain ? `${plan.boss.villain} villain` : 'Champion', ms: 1400 });
 	return I.cutIn({ ...base, ms: 1300 });
 }
@@ -288,6 +302,12 @@ async function finale(plan, F, src, targets, snd) {
 		const c = src ? center(src) : targets[0] ? center(targets[0].token) : null;
 		playSound('skill-ready');
 		await cutInFor(plan, F);
+		// a Zero Power with its own scene: play that instead of the general charge and release
+		const key = zeroKey(plan);
+		if (key) {
+			if (src && F.camera) I.cameraPush(c, { zoom: F.camera, inMs: 420, hold: 900, outMs: 400 });
+			if (await playZero(key, { plan, src, targets })) return;
+		}
 		// then the power gathers, with the camera leaning in on the user
 		if (src && F.camera) I.cameraPush(c, { zoom: F.camera, inMs: 420, hold: 1100, outMs: 300 });
 		playSound('high-powering-up', { volume: 0.9 });
