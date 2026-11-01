@@ -31,6 +31,31 @@ import * as waterJet from './pfx/fx/water/water-jet.js';
 import * as pfxTornado from './pfx/fx/nature/tornado.js';
 import * as pfxWisp from './pfx/fx/critters/wisp.js';
 import * as pfxPoof from './pfx/fx/spawn/poof.js';
+import * as daggerFlurry from './pfx/fx/melee/dagger-flurry.js';
+import * as heavyCleave from './pfx/fx/melee/heavy-cleave.js';
+import * as critHit from './pfx/fx/impacts/crit-hit.js';
+import * as fireworkBurst from './pfx/fx/explosions/firework-burst.js';
+import * as coinDrop from './pfx/fx/spawn/coin-drop.js';
+import * as chestOpen from './pfx/fx/pickups/chest-open.js';
+import * as powerStar from './pfx/fx/pickups/power-star.js';
+import * as spellCharge from './pfx/fx/arcane/spell-charge.js';
+import * as magicCircleCast from './pfx/fx/arcane/magic-circle-cast.js';
+import * as starFall from './pfx/fx/arcane/star-fall.js';
+import * as manaBurst from './pfx/fx/arcane/mana-burst.js';
+import * as timeStop from './pfx/fx/arcane/time-stop.js';
+import * as arcaneBeam from './pfx/fx/arcane/arcane-beam.js';
+import * as trinityLink from './pfx/fx/arcane/trinity-link.js';
+import * as chargeUp from './pfx/fx/lightning/charge-up.js';
+import * as stormCloud from './pfx/fx/lightning/storm-cloud.js';
+import * as holyPillar from './pfx/fx/holy/holy-pillar.js';
+import * as healAoe from './pfx/fx/holy/heal-aoe.js';
+import * as featherBurst from './pfx/fx/holy/feather-burst.js';
+import * as divineShield from './pfx/fx/holy/divine-shield.js';
+import * as hexSigil from './pfx/fx/shadow/hex-sigil.js';
+import * as curse from './pfx/fx/shadow/curse.js';
+import * as forceField from './pfx/fx/scifi/force-field.js';
+import * as diceRoll from './pfx/fx/ui/dice-roll.js';
+import * as statRise from './pfx/fx/ui/stat-rise.js';
 
 /**
  * The pixel effects: Sprite Fusion's open source pixel art VFX (scripts/sf), plus the ones drawn for this module
@@ -97,7 +122,8 @@ const nearby = (P, i, r = 34) => {
  * effect instead of turning it upside down. Our palettes run bright to dark, theirs dark to bright.
  */
 function lib(mod, P, at, { aim = false, ramp = true, ...opts } = {}) {
-	const o = { x: at[0] / 2, y: at[1] / 2, seed: (P.seed % 997) + 1, ...opts };
+	// per-play options first, so what make() converted (the triangle's corners) wins over the raw values
+	const o = { x: at[0] / 2, y: at[1] / 2, seed: (P.seed % 997) + 1, ...(P.opts ?? {}), ...opts };
 	if (aim) {
 		o.flip = Math.cos(P.angle) < 0;
 		o.angle = o.flip ? P.angle - Math.PI : P.angle;
@@ -616,3 +642,73 @@ export const isPixel = (id) => typeof id === 'string' && id.startsWith('sf-') &&
 export const PIXEL_PROJECTILES = Object.entries(PIXEL)
 	.filter(([, d]) => d.cat === 'Pixel Bolts')
 	.map(([id, d]) => [id, d.label]);
+
+/* ------------------------------------------------------------------ */
+/*  More of the pixelfx library: the Zero Power scenes are built from these, and any animation can pick them */
+/* ------------------------------------------------------------------ */
+
+const ZC = 'Pixel Limit Break';
+/** [id, module, label, where it stands, play time for loops, when it lands (s)] */
+const LIBRARY = [
+	['sf-pfx-dagger-flurry', daggerFlurry, 'Dagger flurry', 'center', 0, 0.15],
+	['sf-pfx-heavy-cleave', heavyCleave, 'Heavy cleave', 'feet', 0, 0.45],
+	['sf-pfx-crit-hit', critHit, 'Critical burst', 'center', 0, 0.05],
+	['sf-pfx-firework-burst', fireworkBurst, 'Firework burst', 'feet', 0, 0.6],
+	['sf-pfx-coin-drop', coinDrop, 'Coin shower', 'feet', 0, 0.2],
+	['sf-pfx-chest-open', chestOpen, 'Treasure chest', 'feet', 0, 1.2],
+	['sf-pfx-power-star', powerStar, 'Power star', 'center', 1.6, 0.2],
+	['sf-pfx-spell-charge', spellCharge, 'Spell charge', 'feet', 1.6, 1.2],
+	['sf-pfx-magic-circle', magicCircleCast, 'Magic circle cast', 'feet', 0, 1.5],
+	['sf-pfx-star-fall', starFall, 'Star fall', 'feet', 0, 0.7],
+	['sf-pfx-mana-burst', manaBurst, 'Mana burst', 'center', 0, 0.2],
+	['sf-pfx-time-stop', timeStop, 'Time stop', 'feet', 0, 1.75],
+	['sf-pfx-arcane-beam', arcaneBeam, 'Arcane beam', 'caster', 1.2, 0.2],
+	['sf-pfx-trinity-link', trinityLink, 'Trinity link', 'feet', 0, 1.15],
+	['sf-pfx-charge-up', chargeUp, 'Charge up', 'feet', 0, 1.8],
+	['sf-pfx-storm-cloud', stormCloud, 'Storm cloud', 'feet', 2.2, 1.6],
+	['sf-pfx-holy-pillar', holyPillar, 'Holy pillar', 'feet', 0, 0.8],
+	['sf-pfx-heal-aoe', healAoe, 'Healing ring', 'feet', 0, 0.6],
+	['sf-pfx-feather-burst', featherBurst, 'Feather burst', 'center', 0, 0.2],
+	['sf-pfx-divine-shield', divineShield, 'Divine shield', 'feet', 1.8, 0.2],
+	['sf-pfx-hex-sigil', hexSigil, 'Hex sigil', 'center', 0, 1.6],
+	['sf-pfx-curse', curse, 'Curse', 'feet', 0, 0.6],
+	['sf-pfx-force-field', forceField, 'Force field', 'feet', 2, 0.3],
+	['sf-pfx-dice-roll', diceRoll, 'Dice roll', 'feet', 0, 1.9],
+	['sf-pfx-stat-rise', statRise, 'Stat rise', 'feet', 0, 0.3],
+];
+
+for (const [id, mod, label, where, run, hit] of LIBRARY) {
+	const m = mod.meta;
+	const dur = m.loop ? run || m.duration || 2 : m.duration || 2;
+	const [w, h] = m.size ?? [120, 120];
+	const [ox, oy] = m.origin ?? [w / 2, h / 2];
+	// box around the target's centre in art pixels; feet sit about half a token lower
+	const dy = where === 'feet' ? 18 : 0;
+	const big = id === 'sf-pfx-trinity-link' ? 120 : 8;
+	PIXEL[id] = {
+		label,
+		cat: ZC,
+		ramp: true,
+		lib: true,
+		dur,
+		cap: dur + 0.6,
+		...(m.loop ? { stopAt: dur } : {}),
+		// fired from the user at the target: the box has to reach from one to the other
+		...(where === 'caster' || where === 'hand' ? { line: true } : {}),
+		hit: Math.min(hit, dur * 0.9),
+		box: [-ox - big, -oy + dy - big, w - ox + big, h - oy + dy + big],
+		make: (P) =>
+			one(() => {
+				const at = where === 'feet' ? [P.x, P.ground] : where === 'hand' ? handOf(P) : where === 'caster' ? P.source.feet() : [P.x, P.y];
+				const extra = {};
+				// the triangle's corners: map points (heroes' feet) turned into the effect's own pixels
+				if (id === 'sf-pfx-trinity-link' && P.opts?.points?.length >= 3) {
+					extra.points = P.opts.points.map((wp) => {
+						const [lx, ly] = P.toLocal(wp);
+						return [(lx - at[0]) / 2, (ly - at[1]) / 2];
+					});
+				}
+				return lib(mod, P, at, { aim: where === 'hand' || where === 'caster', ...extra });
+			}),
+	};
+}

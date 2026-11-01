@@ -39,6 +39,7 @@ Hooks.once('init', () => {
 	reg('camera', { name: 'Camera push on big hits', hint: 'The view leans in toward heavy impacts, then settles back.', scope: 'client', type: Boolean, default: true });
 	reg('dim', { name: 'Darken the scene for big moves', hint: 'Everything but the fighters goes dark during heavy spells and heroic moves.', scope: 'client', type: Boolean, default: true });
 	reg('cutins', { name: 'Cut-ins for heroic moves', hint: 'Full-screen banner with the character portrait before big moves.', scope: 'client', type: Boolean, default: true });
+	reg('epicBosses', { name: 'Epic boss attacks', hint: 'Champions and villains hit one level harder: a red flare and magic circle as they wind up, a cut-in on their biggest moves, and shockwaves where they land. Zero Powers (and anything set to “Limit break”) always play as a full limit break.', scope: 'world', type: Boolean, default: true });
 	reg('numbers', { name: 'Battle damage numbers', hint: 'Damage and healing pop off the token when HP changes: gold and larger on a critical, with the element under it. Replaces the system’s plain HP text.', scope: 'client', type: Boolean, default: true });
 	reg('animateUnmapped', { name: 'Animate homebrew abilities', hint: 'Skills, spells and features that are not in the Project FU compendium get an animation guessed from their type and damage. Weapons and basic attacks always animate.', scope: 'world', type: Boolean, default: true });
 	game.settings.register(MODULE_ID, 'overrides', { scope: 'world', config: false, type: Object, default: {} });

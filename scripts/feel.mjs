@@ -6,9 +6,9 @@ import { ELEMENT_LOOK, getSetting } from './presets.mjs';
  * Every one of those can be overridden per ability in the editor; anything left on "auto" follows the level.
  */
 
-export const LEVELS = ['light', 'normal', 'heavy', 'heroic'];
+export const LEVELS = ['light', 'normal', 'heavy', 'heroic', 'ultimate'];
 
-export const LEVEL_LABELS = { light: 'Light', normal: 'Normal', heavy: 'Heavy', heroic: 'Heroic' };
+export const LEVEL_LABELS = { light: 'Light', normal: 'Normal', heavy: 'Heavy', heroic: 'Heroic', ultimate: 'Limit break' };
 
 /** What each level does on its own */
 const BASE = {
@@ -16,11 +16,13 @@ const BASE = {
 	normal: { freeze: 60, shake: 0.6, camera: 0, dim: 0, cutin: false, windup: true, trail: false, debris: 14, ring: 1, burst: 1.1, screen: 0, scorch: false, knock: 1.2, orb: 0.26 },
 	heavy: { freeze: 110, shake: 1.3, camera: 1.08, dim: 0.45, cutin: false, windup: true, trail: true, debris: 24, ring: 1.3, burst: 1.5, screen: 0.14, scorch: true, knock: 1.9, orb: 0.36 },
 	heroic: { freeze: 170, shake: 2.4, camera: 1.12, dim: 0.7, cutin: true, windup: true, trail: true, debris: 36, ring: 2, burst: 2.2, screen: 0.4, scorch: true, knock: 2.6, orb: 0.5 },
+	// Zero Powers and anything set to "Limit break": a whole cinematic (sequence.mjs finale)
+	ultimate: { freeze: 260, shake: 3.5, camera: 1.18, dim: 0.88, cutin: true, windup: true, trail: true, debris: 56, ring: 2.8, burst: 3, screen: 0.7, scorch: true, knock: 3.2, orb: 0.7 },
 };
 
 /* Choices offered in the editor. '' always means automatic. */
 export const IMPACT_FIELDS = {
-	power: { label: 'Impact', options: { light: 'Light', normal: 'Normal', heavy: 'Heavy', heroic: 'Heroic' } },
+	power: { label: 'Impact', options: { light: 'Light', normal: 'Normal', heavy: 'Heavy', heroic: 'Heroic', ultimate: 'Limit break' } },
 	freeze: { label: 'Freeze on hit', options: { 0: 'None', 60: 'Short', 110: 'Medium', 170: 'Long', 260: 'Very long' } },
 	shake: { label: 'Screen shake', options: { 0: 'None', 0.6: 'Light', 1.3: 'Medium', 2.4: 'Heavy', 3.5: 'Earthquake' } },
 	camera: { label: 'Camera push', options: { off: 'Off', on: 'On' } },
@@ -36,6 +38,7 @@ const MARK_BY_ELEMENT = { fire: 0x1a0d06, bolt: 0x0d0d14, earth: 0x2a1d10, dark:
 
 /** The level an ability has when nobody chose one */
 export function autoLevel({ style, itemType, targets = 1 } = {}) {
+	if (itemType === 'zeroPower') return 'ultimate';
 	if (itemType === 'heroic') return 'heroic';
 	if (style === 'support' || style === 'self') return 'light';
 	if (style === 'spell') return targets >= 2 ? 'heavy' : 'normal';
@@ -54,7 +57,12 @@ export function feelOf(plan, ctx = {}) {
 	const imp = spec.impact ?? {};
 	const base = imp.power && BASE[imp.power] ? imp.power : autoLevel({ style: spec.style, itemType: plan.itemType, targets: ctx.targets ?? plan.targets?.length ?? 1 });
 	let level = base;
-	if (plan.crit && plan.offensive) level = bump(level, 1);
+	const below = (l) => LEVELS.indexOf(l) < LEVELS.indexOf('heroic');
+	// a crit hits one level harder, but only a limit break is a limit break
+	if (plan.crit && plan.offensive && below(level)) level = bump(level, 1);
+	// champions and villains: every attack of theirs lands like a boss's
+	const boss = !!plan.boss && !!plan.offensive && base !== 'ultimate' && !ctx.ignoreBoss && getSetting('epicBosses') !== false;
+	if (boss && below(level)) level = bump(level, 1);
 	if (plan.fumble) level = 'light';
 	const b = BASE[level];
 	const offensive = !!plan.offensive;
@@ -67,8 +75,10 @@ export function feelOf(plan, ctx = {}) {
 		shake: offensive ? b.shake : 0,
 		camera: b.camera,
 		// darkening is for spells and big moves; a heavy sword crit stays in the light
-		dim: base === 'heroic' ? b.dim : level === 'heavy' || level === 'heroic' ? (spec.style === 'spell' ? 0.45 : 0) : 0,
-		cutin: base === 'heroic',
+		dim: base === 'heroic' || base === 'ultimate' ? b.dim : level === 'heavy' || level === 'heroic' ? (spec.style === 'spell' || boss ? 0.45 : 0) : 0,
+		cutin: base === 'heroic' || base === 'ultimate' || (boss && level === 'heroic'),
+		ultimate: level === 'ultimate',
+		boss,
 		windup: spec.style === 'melee' && b.windup,
 		trail: spec.style === 'melee' && b.trail,
 		debris: offensive ? (DEBRIS_BY_ELEMENT[el] ?? 'spark') : 'none',

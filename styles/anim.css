@@ -9,35 +9,11 @@
 :where(.application.fua-app button) { all: unset; box-sizing: border-box; cursor: pointer; font: inherit; color: inherit; }
 .application.fua-app button:focus-visible, .application.fua-app :is(select, input):focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
-.fua-ed { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; font-size: 14px; }
-.fua-ed header { display: flex; flex-direction: column; gap: 2px; }
-.fua-ed header b { font-size: 20px; font-weight: 700; }
-.fua-ed header small { color: var(--ink3); font-size: 12px; }
-.fua-ed .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
-.fua-ed .grid label { display: flex; flex-direction: column; gap: 3px; }
-.fua-ed .grid label.wide { grid-column: 1 / -1; }
-.fua-ed .grid label.off { opacity: 0.35; pointer-events: none; }
-.fua-ed .grid label > span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink2); display: flex; justify-content: space-between; }
-.fua-ed select { width: 100%; height: 30px; padding: 0 8px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--ink); }
-.fua-ed select option, .fua-ed select optgroup { background: #121b33; color: var(--ink); }
-.fua-ed input[type='range'] { width: 100%; accent-color: var(--gold); }
-.fua-ed .previews { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.fua-ed .previews.off { opacity: 0.3; }
-.fua-ed figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.fua-ed .pv { width: 100%; max-width: 150px; aspect-ratio: 1; border-radius: 6px; background: radial-gradient(circle at 50% 55%, #1b2742, #070b14 75%); border: 1px solid rgba(159, 208, 255, 0.16); overflow: hidden; }
-.fua-ed canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-.fua-ed figcaption { font-size: 11px; color: var(--ink3); }
-.fua-ed fieldset.scope { border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px 8px; display: flex; flex-direction: column; gap: 4px; margin: 0; }
-.fua-ed fieldset.scope legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink2); padding: 0 4px; }
-.fua-ed fieldset.scope label { display: flex; align-items: center; gap: 8px; }
-.fua-ed .note, .fua-lib .note { margin: 0; font-size: 12px; color: var(--ink3); line-height: 1.4; }
-.fua-ed footer { display: flex; align-items: center; gap: 8px; }
-.fua-ed footer .sp { flex: 1; }
-.fua-ed footer button, .fua-lib li button { padding: 6px 14px; border-radius: 4px; border: 1px solid rgba(159, 208, 255, 0.45); background: rgba(90, 169, 255, 0.12); font-weight: 700; font-size: 13px; }
-.fua-ed footer button.gold { border-color: var(--gold); background: rgba(242, 196, 90, 0.16); color: #fff3d1; }
-.fua-ed footer button:hover, .fua-lib li button:hover { filter: brightness(1.3); }
 
 .fua-lib { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; height: 100%; min-height: 0; font-size: 14px; }
+.fua-lib .note { margin: 0; font-size: 12px; color: var(--ink3); line-height: 1.4; }
+.fua-lib li button { padding: 3px 10px; border-radius: 4px; border: 1px solid rgba(159, 208, 255, 0.45); background: rgba(90, 169, 255, 0.12); font-weight: 700; font-size: 12px; }
+.fua-lib li button:hover { filter: brightness(1.3); }
 .fua-lib .top { display: flex; align-items: center; gap: 14px; }
 .fua-lib .top input[type='search'] { flex: 1; height: 32px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--ink); }
 .fua-lib .top label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); white-space: nowrap; }
@@ -52,13 +28,6 @@
 .fua-lib li.none .d { color: var(--ink3); }
 .fua-lib li button { padding: 3px 10px; font-size: 12px; }
 .fua-lib li .n small { margin-left: 6px; font-weight: 400; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); }
-.fua-ed .snd { display: flex; flex-direction: column; gap: 3px; }
-.fua-ed .snd.off { opacity: 0.35; pointer-events: none; }
-.fua-ed .snd > span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink2); }
-.fua-ed .snd .row { display: flex; gap: 6px; }
-.fua-ed .snd .row select { flex: 1; min-width: 0; }
-.fua-ed .snd .play { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 4px; border: 1px solid rgba(159, 208, 255, 0.45); background: rgba(90, 169, 255, 0.12); font-size: 12px; }
-.fua-ed .snd .play:hover { filter: brightness(1.3); }
 
 /* Cut-in for big moves */
 .fua-cutin { position: fixed; inset: 0; z-index: 90; pointer-events: none; overflow: hidden; --c: #f2c45a; }
@@ -79,16 +48,61 @@
 @keyframes fua-txt { from { transform: translateY(-50%) skewY(5deg) translateX(60%); opacity: 0; } to { transform: translateY(-50%) skewY(5deg) translateX(0); opacity: 1; } }
 
 /* Impact section */
+
+
+/* ---------------- Animation editor ---------------- */
 .application.fua-editor { max-height: 94vh; }
 .application.fua-editor .window-content { overflow-y: auto; }
-.fua-ed fieldset.impact { border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px 12px; margin: 0; display: flex; flex-direction: column; gap: 8px; background: linear-gradient(180deg, rgba(242, 196, 90, 0.06), transparent 60%); }
-.fua-ed fieldset.impact legend { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); padding: 0 4px; font-weight: 700; }
-.fua-ed .impact .hint { margin: 0; font-size: 12px; color: var(--ink3); line-height: 1.4; }
+.fua-ed { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; font-size: 14px; }
+.fua-ed header { display: flex; align-items: flex-end; gap: 14px; }
+.fua-ed header .ttl { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fua-ed header b { font-size: 20px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fua-ed header small { color: var(--ink3); font-size: 12px; }
+.fua-ed header .style { width: 250px; flex: none; }
+.fua-ed :is(.fld, header .style) { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fua-ed :is(.fld, header .style, .grid3 label, .cutin label, .cutin .por) > span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink2); display: flex; justify-content: space-between; }
+.fua-ed select { width: 100%; height: 30px; padding: 0 8px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--ink); }
+.fua-ed select option, .fua-ed select optgroup { background: #121b33; color: var(--ink); }
+.fua-ed input[type='range'] { width: 100%; accent-color: var(--gold); margin: 7px 0 0; }
+.fua-ed .empty { margin: 4px 0; padding: 22px; border: 1px dashed rgba(159, 208, 255, 0.3); border-radius: 8px; text-align: center; color: var(--ink3); }
+.fua-ed .hint, .fua-ed .note { margin: -4px 0 0; font-size: 12px; color: var(--ink3); line-height: 1.4; }
+
+/* the effects: one card per slot, each a live preview of its choice */
+.fua-ed .slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.fua-ed .slots.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fua-ed .slot { display: flex; flex-direction: column; gap: 3px; padding: 6px; border-radius: 8px; border: 1px solid rgba(159, 208, 255, 0.18); background: rgba(255, 255, 255, 0.03); text-align: center; transition: border-color 0.12s, background 0.12s; }
+.fua-ed .slot:hover { border-color: var(--gold); background: rgba(242, 196, 90, 0.08); }
+.fua-ed .slot .pv { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; display: grid; place-items: center; background: radial-gradient(circle at 50% 55%, #1b2742, #070b14 75%); }
+.fua-ed .slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.fua-ed .slot .pv > i { line-height: 1; }
+.fua-ed .slot.empty .pv i { position: relative; color: var(--ink3); font-size: 18px; }
+.fua-ed .slot:hover.empty .pv i { color: var(--gold); }
+.fua-ed .slot small { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); margin-top: 2px; }
+.fua-ed .slot b { font-size: 12px; font-weight: 700; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; }
+.fua-ed .slot.empty b { color: var(--ink3); font-weight: 400; }
+
+.fua-ed .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.fua-ed .fld .in { display: flex; gap: 6px; align-items: center; }
+.fua-ed .fld .in select { flex: 1; min-width: 0; }
+.fua-ed .play { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 4px; border: 1px solid rgba(159, 208, 255, 0.45); background: rgba(90, 169, 255, 0.12); font-size: 12px; }
+.fua-ed .play:hover { filter: brightness(1.3); }
+.fua-ed .colorpick input[type='color'] { flex: none; width: 38px; height: 30px; padding: 2px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); cursor: pointer; }
+
+/* impact: folded away unless you want it */
+.fua-ed details.impact { border: 1px solid var(--line); border-radius: 6px; background: linear-gradient(180deg, rgba(242, 196, 90, 0.05), transparent 60%); }
+.fua-ed details.impact > summary { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; list-style: none; }
+.fua-ed details.impact > summary::-webkit-details-marker { display: none; }
+.fua-ed details.impact > summary::before { content: '\25B8'; color: var(--gold); transition: transform 0.15s; }
+.fua-ed details.impact[open] > summary::before { transform: rotate(90deg); }
+.fua-ed details.impact > summary b { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
+.fua-ed details.impact > summary span { font-size: 12px; color: var(--ink3); }
+.fua-ed details.impact[open] { padding-bottom: 12px; }
+.fua-ed details.impact > :not(summary) { margin-left: 12px; margin-right: 12px; }
+.fua-ed details.impact .hint { margin-top: 0; margin-bottom: 10px; }
 .fua-ed .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
 .fua-ed .grid3 label, .fua-ed .cutin label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .fua-ed .grid3 label.off { opacity: 0.35; pointer-events: none; }
-.fua-ed .grid3 label > span, .fua-ed .cutin label > span, .fua-ed .cutin .por > span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink2); }
-.fua-ed .cutin { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 8px 12px; padding-top: 8px; border-top: 1px dashed rgba(159, 208, 255, 0.2); }
+.fua-ed .cutin { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 8px 12px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(159, 208, 255, 0.2); }
 .fua-ed .cutin.off { display: none; }
 .fua-ed .cutin .wide { grid-column: 1 / 2; }
 .fua-ed .cutin .por { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 3px; }
@@ -96,17 +110,23 @@
 .fua-ed .cutin .por img { width: 40px; height: 40px; object-fit: cover; object-position: 50% 25%; border-radius: 4px; border: 1px solid var(--line); }
 .fua-ed .cutin .por button { padding: 5px 12px; border-radius: 4px; border: 1px solid rgba(159, 208, 255, 0.45); background: rgba(90, 169, 255, 0.12); font-weight: 700; font-size: 12px; }
 .fua-ed .cutin .por button:hover { filter: brightness(1.3); }
-.application.fua-app .fua-ed input[type='text'] { width: 100%; height: 30px; padding: 0 8px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--ink); font: inherit; font-size: 13px; box-sizing: border-box; }
-.application.fua-app .fua-ed input[type='color'] { width: 100%; height: 30px; padding: 2px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); box-sizing: border-box; cursor: pointer; }
-.fua-ed footer label.crit { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink2); }
-.fua-ed .colorpick .row { display: flex; gap: 6px; align-items: center; }
-.fua-ed .colorpick input[type='color'] { flex: none; width: 38px; height: 30px; padding: 2px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); cursor: pointer; }
+.application.fua-app .fua-ed input[type='text'] { width: 100%; height: 30px; padding: 0 8px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--ink); }
+.application.fua-app .fua-ed .cutin input[type='color'] { width: 100%; height: 30px; padding: 2px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); box-sizing: border-box; cursor: pointer; }
 
-/* effect slots in the editor: the choice, and a button into the picker */
-.fua-ed .slot .pick { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); }
-.fua-ed .slot .pick b { flex: 1; min-width: 0; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fua-ed .slot .pick i { color: var(--gold); font-size: 12px; }
-.fua-ed .slot .pick:hover { border-color: var(--gold); background: rgba(242, 196, 90, 0.1); }
+/* save for: a segmented switch */
+.fua-ed .scope { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fua-ed .scope > span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink2); margin-right: 4px; }
+.fua-ed .scope label { padding: 3px 12px; border-radius: 999px; border: 1px solid rgba(238, 243, 255, 0.2); color: var(--ink3); font-size: 12px; cursor: pointer; }
+.fua-ed .scope label.on { color: var(--gold); border-color: var(--gold); background: rgba(242, 196, 90, 0.14); }
+.fua-ed .scope input { position: absolute; opacity: 0; width: 0; height: 0; }
+.fua-ed .scope label:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.fua-ed footer { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(159, 208, 255, 0.12); }
+.fua-ed footer .sp { flex: 1; }
+.fua-ed footer button { padding: 6px 14px; border-radius: 4px; border: 1px solid rgba(159, 208, 255, 0.45); background: rgba(90, 169, 255, 0.12); font-weight: 700; font-size: 13px; }
+.fua-ed footer button.gold { border-color: var(--gold); background: rgba(242, 196, 90, 0.16); color: #fff3d1; }
+.fua-ed footer button:hover { filter: brightness(1.3); }
+.fua-ed footer label.crit { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink2); }
 
 /* effect picker: a grid of tiles */
 .fua-pick { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -127,3 +147,68 @@
 .fua-pick .tile .pv em { position: absolute; top: 3px; right: 3px; font-style: normal; font-size: 9px; letter-spacing: 0.08em; padding: 0 4px; border-radius: 3px; background: rgba(0, 0, 0, 0.6); color: var(--ink2); }
 .fua-pick .tile .nm { font-size: 11px; line-height: 1.25; color: var(--ink2); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; }
 .fua-pick .note { margin: 0; padding: 6px 14px 10px; font-size: 11px; color: var(--ink3); }
+
+.fua-pick .tile .pv video.loading { position: absolute; opacity: 0; }
+.fua-pick .tile.busy .pv::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 6px; height: 2px; border-radius: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); background-size: 200% 100%; animation: fua-load 0.9s linear infinite; }
+@keyframes fua-load { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Limit break cut-in: white flash, a second band crossing behind, light rays, a kicker over the name */
+.fua-cutin.limit .flash { position: absolute; inset: 0; background: #fff; animation: fua-flash 0.5s ease-out both; mix-blend-mode: screen; }
+.fua-cutin.limit .band { top: 32%; height: 36vh; box-shadow: 0 0 60px color-mix(in srgb, var(--c) 60%, transparent), 0 0 0 2px color-mix(in srgb, var(--c) 70%, transparent); }
+.fua-cutin.limit .band.back { top: 26%; height: 48vh; transform: skewY(7deg); opacity: 0.55; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 40%, #050812) 30%, color-mix(in srgb, var(--c) 40%, #050812) 70%, transparent); animation: fua-band-back 0.5s 0.05s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fua-cutin.limit .rays { position: absolute; inset: -50%; background: repeating-conic-gradient(from 0deg at 50% 50%, color-mix(in srgb, var(--c) 30%, transparent) 0deg 3deg, transparent 3deg 14deg); animation: fua-rays 2.4s linear infinite; opacity: 0.55; mix-blend-mode: screen; }
+.fua-cutin .txt em { font-family: 'FBUI Antonio', 'Antonio', 'Arial Narrow', sans-serif; font-style: normal; font-weight: 700; font-size: 3vh; letter-spacing: 0.5em; text-transform: uppercase; color: #0b1220; background: var(--c); padding: 0.2vh 1.2vh 0.2vh 1.7vh; margin-bottom: 0.6vh; animation: fua-kicker 0.5s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fua-cutin.limit .txt b { font-size: 13vh; text-shadow: 0 0 24px var(--c), 0 0 4px #fff, 0.5vh 0.5vh 0 color-mix(in srgb, var(--c) 50%, #000); animation: fua-txt 0.4s 0.08s cubic-bezier(0.2, 0.8, 0.2, 1) both, fua-pulse 0.9s 0.5s ease-in-out infinite alternate; }
+.fua-cutin.limit.out .rays, .fua-cutin.limit.out .band.back { animation: fua-band-out 0.28s ease-in both; }
+.fua-cutin.boss .band { background: linear-gradient(90deg, rgba(20, 2, 6, 0.97), rgba(48, 8, 14, 0.94) 60%, rgba(20, 2, 6, 0.9)); box-shadow: 0 0 40px rgba(255, 59, 78, 0.45); }
+.fua-cutin.boss .txt b { text-shadow: 0 0 18px var(--c), 0.4vh 0.4vh 0 #000; }
+@keyframes fua-flash { from { opacity: 0.95; } to { opacity: 0; } }
+@keyframes fua-band-back { from { transform: skewY(7deg) translateX(110%); } to { transform: skewY(7deg) translateX(0); } }
+@keyframes fua-rays { to { transform: rotate(360deg); } }
+@keyframes fua-kicker { from { transform: scaleX(0); transform-origin: right; } to { transform: scaleX(1); transform-origin: right; } }
+@keyframes fua-pulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+
+/* Cinema bars for limit breaks */
+.fua-bars { position: fixed; inset: 0; z-index: 89; pointer-events: none; }
+.fua-bars i { position: absolute; left: 0; right: 0; height: 11vh; background: #000; transition: transform var(--ms, 400ms) cubic-bezier(0.2, 0.8, 0.2, 1); }
+.fua-bars i:first-child { top: 0; transform: translateY(-100%); }
+.fua-bars i:last-child { bottom: 0; transform: translateY(100%); }
+.fua-bars.in i { transform: translateY(0); }
+
+/* Zero Chance: three dice tumbling in and landing */
+.fua-zero { position: fixed; inset: 0; z-index: 91; pointer-events: none; display: flex; align-items: center; justify-content: center; --c: #b07cff; }
+.fua-zero.dice { gap: 6vh; }
+.fua-zero .die { width: 16vh; height: 16vh; perspective: 60vh; animation: fua-die-in 1.1s calc(var(--i) * 0.12s) cubic-bezier(0.2, 0.9, 0.25, 1.15) both; }
+.fua-zero .die .face { width: 100%; height: 100%; border-radius: 2.4vh; background: radial-gradient(circle at 30% 25%, #fff, #e8e2ff 55%, #c9bdf5); box-shadow: 0 0 0 0.5vh var(--c), 0 0 5vh color-mix(in srgb, var(--c) 80%, transparent), inset 0 -1vh 2vh rgba(60, 30, 120, 0.25); display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 2vh; box-sizing: border-box; animation: fua-die-spin 1.1s calc(var(--i) * 0.12s) cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.fua-zero .die i { display: block; margin: auto; width: 2.6vh; height: 2.6vh; border-radius: 50%; }
+.fua-zero .die i.on { background: radial-gradient(circle at 35% 35%, #6b4bd8, #2a1460); box-shadow: 0 0 1vh color-mix(in srgb, var(--c) 70%, transparent); }
+.fua-zero.out { animation: fua-zero-out 0.3s ease-in both; }
+@keyframes fua-die-in { from { transform: translate(-60vw, -40vh) scale(0.4); opacity: 0; } 60% { opacity: 1; } to { transform: none; } }
+@keyframes fua-die-spin { from { transform: rotateX(720deg) rotateZ(-540deg); } to { transform: none; } }
+@keyframes fua-zero-out { to { opacity: 0; transform: scale(1.15); } }
+
+/* Zero Objective: a giant clock filling its sections */
+.fua-zero.clock .face { position: relative; width: 44vh; height: 44vh; border-radius: 50%; background: radial-gradient(circle, rgba(6, 18, 24, 0.92) 55%, rgba(6, 18, 24, 0.7)); box-shadow: 0 0 0 0.6vh var(--c), 0 0 8vh color-mix(in srgb, var(--c) 60%, transparent); animation: fua-clock-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; overflow: hidden; }
+.fua-zero.clock .face b { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from var(--a), var(--c) 0deg calc(var(--s) - 2deg), transparent calc(var(--s) - 2deg) 360deg); opacity: 0.08; -webkit-mask: radial-gradient(circle, transparent 28%, #000 29%, #000 92%, transparent 93%); mask: radial-gradient(circle, transparent 28%, #000 29%, #000 92%, transparent 93%); }
+.fua-zero.clock .face b.on, .fua-zero.clock .face b.was { opacity: 0.85; }
+.fua-zero.clock .face b.fill { animation: fua-sec-fill 0.25s calc(0.35s + var(--d)) ease-out both; }
+.fua-zero.clock .face b.was { animation: fua-sec-erase 0.25s calc(0.35s + var(--d)) ease-in both; }
+.fua-zero.clock .hand { position: absolute; left: 50%; top: 50%; width: 0.8vh; height: 20vh; margin-left: -0.4vh; background: linear-gradient(#fff, var(--c)); border-radius: 0.4vh; transform-origin: 50% 0; animation: fua-hand 1.4s cubic-bezier(0.3, 0, 0.2, 1) both; box-shadow: 0 0 2vh var(--c); }
+.fua-zero.clock .hub { position: absolute; left: 50%; top: 50%; width: 3vh; height: 3vh; margin: -1.5vh 0 0 -1.5vh; border-radius: 50%; background: #fff; box-shadow: 0 0 2vh var(--c); }
+@keyframes fua-clock-in { from { transform: scale(0.2) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fua-sec-fill { from { opacity: 0.08; filter: brightness(3); } to { opacity: 0.85; filter: none; } }
+@keyframes fua-sec-erase { to { opacity: 0.08; } }
+@keyframes fua-hand { from { transform: rotate(180deg); } to { transform: rotate(1620deg); } }
+
+/* Limit break: the scene, its color and its three stages */
+.fua-ed .limit { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px; border-radius: 8px; border: 1px solid rgba(242, 196, 90, 0.45); background: linear-gradient(180deg, rgba(242, 196, 90, 0.08), rgba(242, 196, 90, 0.02)); }
+.fua-ed .limit > .row > .fld > span { color: var(--gold); }
+.fua-ed .limit .hint { margin: 0; }
+.fua-ed .slots.zero { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fua-ed .zcard { position: relative; display: flex; }
+.fua-ed .zcard .slot { flex: 1; }
+.fua-ed .zcard .slot em { font-style: normal; font-size: 10px; line-height: 1.3; color: var(--ink3); }
+.fua-ed .zcard .zreset { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: rgba(11, 18, 32, 0.85); border: 1px solid var(--line); font-size: 12px; color: var(--gold); }
+.fua-ed .row.hide { display: none; }
+.fua-ed .row.zsize { grid-template-columns: minmax(0, 1fr); }
+.fua-ed .row.zsize .colorpick { display: none; }

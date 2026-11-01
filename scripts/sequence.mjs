@@ -1,4 +1,4 @@
-import { ACTIONS, MODULE_ID, actionSpec, activePreset, getSetting, itemDamageType, resolveSpec } from './presets.mjs';
+import { ACTIONS, MODULE_ID, actionSpec, activePreset, bossOf, getSetting, itemDamageType, itemKind, resolveSpec } from './presets.mjs';
 import { playSound, soundsFor } from './audio.mjs';
 import { center, dodge, ease, fxDuration, knockback, lunge, playFx, preload, tweenOffset, wait } from './player.mjs';
 import { hitstop } from './clock.mjs';
@@ -7,6 +7,7 @@ import * as I from './impact.mjs';
 import { isJb, playJb } from './jb2a.mjs';
 import { isPixel, playPixel, tokenFeet } from './pixel.mjs';
 import { PIXEL_CRIT } from './pixelmap.mjs';
+import { ZERO_EFFECTS, playZero, zeroKeyOf, zeroTypesOf } from './zero.mjs';
 
 /**
  * Turning a chat card into an animation plan (on the client that rolled it), and playing a plan (on every client).
@@ -90,7 +91,10 @@ export function planFromMessage(msg) {
 		crit: !!check?.critical,
 		fumble: !!check?.fumble,
 		name: item.name,
-		itemType: item.type,
+		itemType: itemKind(item),
+		zero: itemKind(item) === 'zeroPower' ? zeroKeyOf(item) : null,
+		zeroTypes: itemKind(item) === 'zeroPower' ? zeroTypesOf(item) : [],
+		boss: bossOf(src.actor),
 		user: src.document?.name ?? src.actor?.name ?? '',
 		portrait: src.actor?.img ?? src.document?.texture?.src ?? null,
 	};
@@ -263,12 +267,77 @@ async function approach(plan, F, src, main) {
 	return { back: () => tweenOffset(src, { x: 0, y: 0 }, Math.min(420, 200 + travel * 0.4), ease.inOut), ux, uy };
 }
 
+/** Which Zero Power scene plays: the one chosen in the editor, else the one read from the item */
+function zeroKey(plan) {
+	const pick = plan.spec?.zero;
+	if (pick === 'generic') return null;
+	if (pick && pick !== 'auto' && ZERO_EFFECTS[pick]) return pick;
+	return plan.zero && ZERO_EFFECTS[plan.zero] ? plan.zero : null;
+}
+
 /** Banner before a big move */
 function cutInFor(plan, F) {
 	if (!F.cutin) return Promise.resolve();
 	const spec = plan.spec;
-	const color = spec.cutinColor || hex(F.color === 0xffd9a0 ? 0xf2c45a : F.color);
-	return I.cutIn({ name: spec.cutinText || plan.name || '', user: plan.user ?? '', img: spec.cutinImg || plan.portrait, color, ms: 1300 });
+	const color = spec.cutinColor || (F.boss && !F.ultimate ? '#ff4d5e' : hex(F.color === 0xffd9a0 ? 0xf2c45a : F.color));
+	const base = { name: spec.cutinText || plan.name || '', user: plan.user ?? '', img: spec.cutinImg || plan.portrait, color };
+	if (F.ultimate) {
+		const z = ZERO_EFFECTS[zeroKey(plan)];
+		return I.cutIn({ ...base, color: spec.cutinColor || (z ? hex(z.color) : base.color), kind: 'limit', kicker: z ? z.label : plan.itemType === 'zeroPower' ? 'Zero Power' : 'Limit Break', ms: 1900 });
+	}
+	if (F.boss) return I.cutIn({ ...base, kind: 'boss', kicker: plan.boss?.villain ? `${plan.boss.villain} villain` : 'Champion', ms: 1400 });
+	return I.cutIn({ ...base, ms: 1300 });
+}
+
+/**
+ * A limit break: cinema bars and darkness, the cut-in while power gathers on the user (magic circle, pillar of
+ * light, focus lines), a white-out, then the move itself at full size with rolling shockwaves, and embers after.
+ */
+async function finale(plan, F, src, targets, snd) {
+	const lit = [src, ...targets.map((t) => t.token)].filter(Boolean);
+	const bars = I.letterbox(420);
+	const undim = I.dimScene(lit, { alpha: F.dim || 0.6, ms: 420 });
+	let settle = null;
+	try {
+		const c = src ? center(src) : targets[0] ? center(targets[0].token) : null;
+		playSound('skill-ready');
+		await cutInFor(plan, F);
+		// a Zero Power with its own scene: play that instead of the general charge and release
+		const key = zeroKey(plan);
+		if (key) {
+			if (src && F.camera) I.cameraPush(c, { zoom: F.camera, inMs: 420, hold: 900, outMs: 400 });
+			if (await playZero(key, { plan, src, targets })) return;
+		}
+		// then the power gathers, with the camera leaning in on the user
+		if (src && F.camera) I.cameraPush(c, { zoom: F.camera, inMs: 420, hold: 1100, outMs: 300 });
+		playSound('high-powering-up', { volume: 0.9 });
+		if (src) settle = await I.chargeUp(src, { color: F.color, ms: 1500 });
+		else await wait(600);
+		// release
+		if (c) I.burstFlash(c, { color: F.color, size: 2.4 });
+		I.screenFlash(0xffffff, Math.max(0.5, F.screen + 0.3), 380);
+		I.shake(1.4, 320);
+		playSound('magisplosion');
+		if (targets.length && F.camera) {
+			plan._camera = true;
+			const cs = targets.map((t) => center(t.token));
+			const mid = { x: cs.reduce((n, p) => n + p.x, 0) / cs.length, y: cs.reduce((n, p) => n + p.y, 0) / cs.length };
+			I.cameraPush(mid, { zoom: F.camera, inMs: 300, hold: 1500, outMs: 700 });
+		}
+		// the user already charged: no second cast, and everything lands bigger
+		const big = { ...plan, spec: { ...plan.spec, cast: null, scale: (plan.spec.scale ?? 1) * 1.5 } };
+		await perform(big, F, src, targets, snd);
+		const spots = (targets.length ? targets.map((t) => t.token) : [src]).filter(Boolean);
+		if (F.offensive) {
+			playSound('eruption', { volume: 0.8 });
+			await Promise.all(spots.map((tk) => I.shockwaves(center(tk), { color: F.color, size: 1.6 * Math.min(2, sizeOf(tk)) })));
+		}
+		playSound('dramatic-finish', { volume: 0.8 });
+		await I.aftermath(spots.map((tk) => center(tk)), { color: F.color, ms: 1100 });
+	} finally {
+		settle?.();
+		await Promise.all([undim(700), bars(600)]);
+	}
 }
 
 /**
@@ -286,10 +355,17 @@ export async function runPlan(plan) {
 	plan._heard = false;
 	plan._camera = false;
 	const F = feelOf(plan, { targets: targets.length });
+	if (F.ultimate) return finale(plan, F, src, targets, snd);
 	const lit = [src, ...targets.map((t) => t.token)].filter(Boolean);
 	const undim = F.dim ? I.dimScene(lit, { alpha: F.dim, ms: 240 }) : null;
+	let calm = null;
 	try {
-		await cutInFor(plan, F);
+		// a champion or villain winds up first: a red flare and a circle at its feet, with its cut-in on big moves
+		if (F.boss && src && targets.length) {
+			playSound('aura-rise', { volume: 0.7 });
+			const [settle] = await Promise.all([I.menace(src, { ms: F.level === 'heroic' ? 640 : 460 }), cutInFor(plan, F)]);
+			calm = settle;
+		} else await cutInFor(plan, F);
 		if (F.level === 'heroic' && F.camera && targets.length) {
 			// lean in on the targets for the whole move
 			plan._camera = true;
@@ -298,8 +374,10 @@ export async function runPlan(plan) {
 			I.cameraPush(mid, { zoom: F.camera, inMs: 380, hold: 1500, outMs: 600 });
 		}
 		await perform(plan, F, src, targets, snd);
+		if (F.boss && F.level === 'heroic') await Promise.all(targets.map((t) => I.shockwaves(center(t.token), { color: 0xff3b4e, size: 1.2 * Math.min(2, sizeOf(t.token)), count: 2 })));
 		if (undim) await wait(F.level === 'heroic' ? 380 : 260);
 	} finally {
+		calm?.();
 		if (undim) await undim(F.level === 'heroic' ? 500 : 340);
 	}
 }

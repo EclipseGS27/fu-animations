@@ -278,8 +278,46 @@ function basicSpec(item) {
  * Best guess for anything not in the compendium table (homebrew skills, NPC abilities, custom spells)
  * @param {{offensive?:boolean, hasTargets?:boolean, damageType?:string}} ctx
  */
+/** Project FU keeps Zero Powers as optional features */
+export const isZeroPower = (item) => item?.type === 'optionalFeature' && item?.system?.optionalType === 'projectfu.zeroPower';
+
+/** The kind of item, as the impact levels see it ('zeroPower' for Zero Powers) */
+export const itemKind = (item) => (isZeroPower(item) ? 'zeroPower' : (item?.type ?? null));
+
+/** A champion or villain: its attacks play like a boss's */
+export function bossOf(actor) {
+	const s = actor?.system;
+	if (!s || actor.type !== 'npc') return null;
+	const rank = s.rank?.value;
+	const villain = s.villain?.value || '';
+	if (rank !== 'champion' && !villain) return null;
+	return { champion: rank === 'champion' ? Number(s.rank?.replacedSoldiers) || 1 : 0, villain };
+}
+
+/** A limit break for a Zero Power nobody set an animation for, from its damage type */
+const ZERO_HIT = {
+	fire: ['sf-meteor', 'sf-explosion-big'],
+	ice: [null, 'sf-ice-nova'],
+	bolt: [null, 'sf-lightning-storm'],
+	air: [null, 'sf-tornado'],
+	earth: [null, 'sf-quake'],
+	light: [null, 'sf-smite'],
+	dark: [null, 'sf-black-hole'],
+	poison: [null, 'sf-poison-cloud'],
+};
+function zeroSpec(item, ctx = {}) {
+	const el = ctx.damageType ?? itemDamageType(item);
+	if (ctx.hasTargets && (ctx.offensive || ctx.damageType)) {
+		const [projectile, hit] = ZERO_HIT[el] ?? [null, 'sf-explosion-big'];
+		return { style: 'spell', cast: 'sf-charge', projectile, hit, after: 'sf-embers', element: 'auto', impact: { power: 'ultimate' } };
+	}
+	if (ctx.hasTargets) return { style: 'support', cast: 'sf-power-up', hit: 'sf-heal-burst', after: 'sf-sparkle', element: 'light', impact: { power: 'ultimate' } };
+	return { style: 'self', cast: 'sf-charge', hit: 'sf-power-up', after: 'sf-sparkle', element: 'light', impact: { power: 'ultimate' } };
+}
+
 export function fallbackSpec(item, ctx = {}) {
 	if (!item) return { style: 'none' };
+	if (isZeroPower(item)) return zeroSpec(item, ctx);
 	switch (item.type) {
 		case 'weapon':
 		case 'customWeapon':
