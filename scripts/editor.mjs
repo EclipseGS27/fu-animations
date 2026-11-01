@@ -1,4 +1,4 @@
-import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, MODULE_ID, PRESETS, ACTIONS, STYLES, WEAPON_CATEGORIES, abilityKey, isHexColor, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, fxLabel, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
+import { ABILITIES, BESTIARY, ELEMENTS, ELEMENT_LOOK, MODULE_ID, PRESETS, ACTIONS, STYLES, WEAPON_CATEGORIES, abilityKey, bossOf, isHexColor, itemKind, weaponOne, activePreset, defaultFor, defaultSpec, describe, entryFor, fxGroups, fxLabel, presetFor, projectileGroups, resolveSpec, weaponKey, worldOverrides } from './presets.mjs';
 import { JBFX, isJb, jbModule } from './jbcore.mjs';
 import { resolveElement, runPlan } from './sequence.mjs';
 import { autoSounds, playSound, soundGroups, soundLabel } from './audio.mjs';
@@ -341,7 +341,7 @@ export class AnimationEditor extends ApplicationV2 {
 	/** What "automatic" means for this ability, before anyone's comfort settings */
 	#feel(over = {}) {
 		const offensive = ['melee', 'ranged', 'spell'].includes(this.spec.style);
-		return feelOf({ spec: { ...this.spec, ...over }, offensive, element: this.previewElement, itemType: this.item?.type ?? (this.fuid && ABILITIES[this.fuid]?.group === 'Heroic Skills' ? 'heroic' : null), crit: false, targets: [{}] }, { targets: 1, ignoreSettings: true });
+		return feelOf({ spec: { ...this.spec, ...over }, offensive, element: this.previewElement, itemType: itemKind(this.item) ?? (this.fuid && ABILITIES[this.fuid]?.group === 'Heroic Skills' ? 'heroic' : null), crit: false, targets: [{}] }, { targets: 1, ignoreSettings: true, ignoreBoss: true });
 	}
 
 	#impactHTML() {
@@ -566,7 +566,8 @@ export class AnimationEditor extends ApplicationV2 {
 			offensive,
 			crit: !!this.previewCrit,
 			name: this.name,
-			itemType: this.item?.type ?? (ABILITIES[this.fuid]?.group === 'Heroic Skills' ? 'heroic' : null),
+			itemType: itemKind(this.item) ?? (ABILITIES[this.fuid]?.group === 'Heroic Skills' ? 'heroic' : null),
+			boss: bossOf(src.actor),
 			user: src.document?.name ?? src.actor?.name ?? '',
 			portrait: src.actor?.img ?? null,
 		});

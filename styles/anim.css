@@ -151,3 +151,26 @@
 .fua-pick .tile .pv video.loading { position: absolute; opacity: 0; }
 .fua-pick .tile.busy .pv::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 6px; height: 2px; border-radius: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); background-size: 200% 100%; animation: fua-load 0.9s linear infinite; }
 @keyframes fua-load { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Limit break cut-in: white flash, a second band crossing behind, light rays, a kicker over the name */
+.fua-cutin.limit .flash { position: absolute; inset: 0; background: #fff; animation: fua-flash 0.5s ease-out both; mix-blend-mode: screen; }
+.fua-cutin.limit .band { top: 32%; height: 36vh; box-shadow: 0 0 60px color-mix(in srgb, var(--c) 60%, transparent), 0 0 0 2px color-mix(in srgb, var(--c) 70%, transparent); }
+.fua-cutin.limit .band.back { top: 26%; height: 48vh; transform: skewY(7deg); opacity: 0.55; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 40%, #050812) 30%, color-mix(in srgb, var(--c) 40%, #050812) 70%, transparent); animation: fua-band-back 0.5s 0.05s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fua-cutin.limit .rays { position: absolute; inset: -50%; background: repeating-conic-gradient(from 0deg at 50% 50%, color-mix(in srgb, var(--c) 30%, transparent) 0deg 3deg, transparent 3deg 14deg); animation: fua-rays 2.4s linear infinite; opacity: 0.55; mix-blend-mode: screen; }
+.fua-cutin .txt em { font-family: 'FBUI Antonio', 'Antonio', 'Arial Narrow', sans-serif; font-style: normal; font-weight: 700; font-size: 3vh; letter-spacing: 0.5em; text-transform: uppercase; color: #0b1220; background: var(--c); padding: 0.2vh 1.2vh 0.2vh 1.7vh; margin-bottom: 0.6vh; animation: fua-kicker 0.5s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fua-cutin.limit .txt b { font-size: 13vh; text-shadow: 0 0 24px var(--c), 0 0 4px #fff, 0.5vh 0.5vh 0 color-mix(in srgb, var(--c) 50%, #000); animation: fua-txt 0.4s 0.08s cubic-bezier(0.2, 0.8, 0.2, 1) both, fua-pulse 0.9s 0.5s ease-in-out infinite alternate; }
+.fua-cutin.limit.out .rays, .fua-cutin.limit.out .band.back { animation: fua-band-out 0.28s ease-in both; }
+.fua-cutin.boss .band { background: linear-gradient(90deg, rgba(20, 2, 6, 0.97), rgba(48, 8, 14, 0.94) 60%, rgba(20, 2, 6, 0.9)); box-shadow: 0 0 40px rgba(255, 59, 78, 0.45); }
+.fua-cutin.boss .txt b { text-shadow: 0 0 18px var(--c), 0.4vh 0.4vh 0 #000; }
+@keyframes fua-flash { from { opacity: 0.95; } to { opacity: 0; } }
+@keyframes fua-band-back { from { transform: skewY(7deg) translateX(110%); } to { transform: skewY(7deg) translateX(0); } }
+@keyframes fua-rays { to { transform: rotate(360deg); } }
+@keyframes fua-kicker { from { transform: scaleX(0); transform-origin: right; } to { transform: scaleX(1); transform-origin: right; } }
+@keyframes fua-pulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+
+/* Cinema bars for limit breaks */
+.fua-bars { position: fixed; inset: 0; z-index: 89; pointer-events: none; }
+.fua-bars i { position: absolute; left: 0; right: 0; height: 11vh; background: #000; transition: transform var(--ms, 400ms) cubic-bezier(0.2, 0.8, 0.2, 1); }
+.fua-bars i:first-child { top: 0; transform: translateY(-100%); }
+.fua-bars i:last-child { bottom: 0; transform: translateY(100%); }
+.fua-bars.in i { transform: translateY(0); }
