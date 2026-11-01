@@ -1,37 +1,43 @@
-import { ELEMENT_LOOK } from './presets.mjs';
 import { playSound } from './audio.mjs';
-import { center, fxDuration, knockback, playFx, tweenOffset, wait } from './player.mjs';
+import { center, knockback, playFx, tweenOffset, wait } from './player.mjs';
 import { hitstop } from './clock.mjs';
+import { pixelDuration } from './pixel.mjs';
 import * as I from './impact.mjs';
 
 /**
- * Zero Powers (High Fantasy Atlas): one limit break per zero effect. Players name their powers freely, so the
- * effect is read from the item (Project FU's "Zero effect" field, then its text, then its name). Each one shares
- * the limit-break opening (cinema bars, darkness, a banner naming the effect) and then plays its own scene.
+ * Zero Powers (High Fantasy Atlas): one limit break per zero effect, built from pixelfx effects
+ * (scripts/pfx, patch-gg/pixelfx). Each scene has three stages a player can change in the editor (charge, main,
+ * finish: any effect from the grid, or none), a color that recolors all three, and its own motion and timing.
+ * Players name their powers freely, so the effect is read from the item: Project FU's "Zero effect" field, then
+ * its text, then its name.
  */
 
 const DAMAGE = ['air', 'bolt', 'dark', 'earth', 'fire', 'ice', 'light', 'poison'];
-const colorOf = (el) => (ELEMENT_LOOK[el] ?? ELEMENT_LOOK.none).color;
-const hex = (n) => `#${Number(n).toString(16).padStart(6, '0')}`;
 const sizeOf = (t) => Math.max(t?.document?.width ?? 1, t?.document?.height ?? 1);
 const g = () => canvas.grid.size;
 
-/** The big hit for each damage type */
-const ELEMENT_HIT = { fire: 'sf-explosion-big', ice: 'sf-ice-nova', bolt: 'sf-lightning-storm', air: 'sf-tornado', earth: 'sf-quake', light: 'sf-smite', dark: 'sf-black-hole', poison: 'sf-poison-cloud', physical: 'sf-impact-heavy', none: 'sf-impact-heavy' };
+/** The big hit for each damage type (Zero Elements, Zero Scourge) */
+export const ELEMENT_HIT = { fire: 'sf-explosion-big', ice: 'sf-ice-nova', bolt: 'sf-lightning-storm', air: 'sf-tornado', earth: 'sf-quake', light: 'sf-smite', dark: 'sf-black-hole', poison: 'sf-poison-cloud', physical: 'sf-pfx-crit-hit', none: 'sf-pfx-crit-hit' };
 
+/**
+ * The eleven zero effects. color: the banner's (the stages keep their own palettes unless the player picks a
+ * color). stages: the default effect for each stage, and what each stage is in this scene.
+ */
 export const ZERO_EFFECTS = {
-	blitz: { label: 'Zero Blitz', color: 0xffc94a, words: /blitz/i },
-	chance: { label: 'Zero Chance', color: 0xb07cff, words: /chance|3d6|odd or even/i },
-	cost: { label: 'Zero Cost', color: 0x5fe39a, words: /\bcost\b|inventory point/i },
-	elements: { label: 'Zero Elements', color: 0xff8a3d, words: /elements?\b/i },
-	limits: { label: 'Zero Limits', color: 0xff5a3c, words: /limits?\b|die size higher/i },
-	magic: { label: 'Zero Magic', color: 0x8a7cff, words: /magic|spell action for free/i },
-	objective: { label: 'Zero Objective', color: 0x4fd8d0, words: /objective|sections of a clock/i },
-	remedy: { label: 'Zero Remedy', color: 0xfff0b0, words: /remedy|recover from all status/i },
-	scourge: { label: 'Zero Scourge', color: 0x9b5cff, words: /scourge/i },
-	shield: { label: 'Zero Shield', color: 0x7fe0ff, words: /shield|damage suffered .* halved/i },
-	triangle: { label: 'Zero Triangle', color: 0xff6bd5, words: /triangle|up to two allies/i },
+	blitz: { label: 'Zero Blitz', color: 0xffc94a, words: /blitz/i, stages: { charge: 'sf-pfx-charge-up', main: 'sf-pfx-dagger-flurry', finish: 'sf-pfx-crit-hit' }, roles: { charge: 'Power gathering on the user', main: 'Each dash-strike', finish: 'The final blow' } },
+	chance: { label: 'Zero Chance', color: 0xb07cff, words: /chance|3d6|odd or even/i, stages: { charge: 'sf-pfx-dice-roll', main: 'sf-pfx-firework-burst', finish: 'sf-pfx-coin-drop' }, roles: { charge: 'The roll', main: 'The jackpot over the user', finish: 'On each target or ally' } },
+	cost: { label: 'Zero Cost', color: 0x5fe39a, words: /\bcost\b|inventory point/i, stages: { charge: 'sf-pfx-magic-circle', main: 'sf-pfx-chest-open', finish: 'sf-pfx-coin-drop' }, roles: { charge: 'Under the user', main: 'The treasure', finish: 'On each ally' } },
+	elements: { label: 'Zero Elements', color: 0xff8a3d, words: /elements?\b/i, stages: { charge: 'sf-pfx-spell-charge', main: 'auto', finish: 'sf-pfx-mana-burst' }, roles: { charge: 'Charging both elements', main: 'Each strike (Automatic: by element)', finish: 'The aura it keeps' } },
+	limits: { label: 'Zero Limits', color: 0xff5a3c, words: /limits?\b|die size higher/i, stages: { charge: 'sf-pfx-charge-up', main: 'sf-pfx-stat-rise', finish: 'sf-pfx-power-star' }, roles: { charge: 'Power gathering', main: 'The Attributes rising', finish: 'The transformation' } },
+	magic: { label: 'Zero Magic', color: 0x8a7cff, words: /magic|spell action for free/i, stages: { charge: 'sf-pfx-spell-charge', main: 'sf-pfx-magic-circle', finish: 'sf-pfx-star-fall' }, roles: { charge: 'On the user', main: 'On each target', finish: 'Falling on each target' } },
+	objective: { label: 'Zero Objective', color: 0x4fd8d0, words: /objective|sections of a clock/i, stages: { charge: 'sf-pfx-time-stop', main: 'sf-pfx-mana-burst', finish: 'sf-twinkle' }, roles: { charge: 'The clock', main: 'Time breaking free', finish: 'After' } },
+	remedy: { label: 'Zero Remedy', color: 0xfff0b0, words: /remedy|recover from all status/i, stages: { charge: 'sf-pfx-holy-pillar', main: 'sf-pfx-heal-aoe', finish: 'sf-pfx-feather-burst' }, roles: { charge: 'Light on each ally', main: 'Healing each ally', finish: 'Over the user' } },
+	scourge: { label: 'Zero Scourge', color: 0x9b5cff, words: /scourge/i, stages: { charge: 'sf-pfx-storm-cloud', main: 'sf-pfx-hex-sigil', finish: 'sf-pfx-curse' }, roles: { charge: 'Gathering over the targets', main: 'Marking each target (then its element strikes)', finish: 'The statuses' } },
+	shield: { label: 'Zero Shield', color: 0x7fe0ff, words: /shield|damage suffered .* halved/i, stages: { charge: 'sf-pfx-divine-shield', main: 'sf-pfx-force-field', finish: 'sf-defense-up' }, roles: { charge: 'On the user', main: 'Over each ally', finish: 'After' } },
+	triangle: { label: 'Zero Triangle', color: 0xff6bd5, words: /triangle|up to two allies/i, stages: { charge: 'sf-pfx-trinity-link', main: 'sf-pfx-arcane-beam', finish: 'sf-pfx-crit-hit' }, roles: { charge: 'Linking the three heroes', main: 'Each hero’s beam', finish: 'Where they meet' } },
 };
+export const ZERO_STAGES = ['charge', 'main', 'finish'];
+export const stageField = (s) => `zero${s[0].toUpperCase()}${s.slice(1)}`;
 
 const strip = (html) => String(html ?? '').replace(/<[^>]+>/g, ' ');
 
@@ -41,7 +47,7 @@ export function zeroKeyOf(item) {
 	const fields = [z?.zeroEffect?.value, strip(z?.zeroEffect?.description), item?.name, strip(item?.system?.description), strip(z?.description)];
 	for (const f of fields) {
 		if (!f) continue;
-		for (const [k, e] of Object.entries(ZERO_EFFECTS)) if (new RegExp(`zero\\s*${k}`, 'i').test(f)) return k;
+		for (const k of Object.keys(ZERO_EFFECTS)) if (new RegExp(`zero\\s*${k}`, 'i').test(f)) return k;
 	}
 	for (const f of fields) {
 		if (!f) continue;
@@ -57,6 +63,13 @@ export function zeroTypesOf(item) {
 	return DAMAGE.filter((d) => new RegExp(`\\b${d}\\b`).test(text)).slice(0, 2);
 }
 
+/** The effect a stage plays: the player's choice, else the scene's own ('none' plays nothing) */
+export function stageOf(spec, key, stage) {
+	const own = spec?.[stageField(stage)];
+	const id = own || ZERO_EFFECTS[key]?.stages[stage];
+	return id === 'none' ? null : id;
+}
+
 /** Tokens on the user's side (for Remedy, Shield, Cost, Triangle) */
 function alliesOf(src) {
 	if (!src) return [];
@@ -64,270 +77,235 @@ function alliesOf(src) {
 	return (canvas.tokens?.placeables ?? []).filter((t) => t.visible && !t.document.hidden && t.document.disposition === disp && t.actor);
 }
 
-const at = (token, extra = {}) => ({ ...center(token), from: center(token), to: center(token), tokenSize: sizeOf(token), token, element: 'none', ...extra });
+/**
+ * Play one stage on a token. element: the player's color (a hex) or a damage type, else the effect's own palette.
+ * Resolves when it lands (its hit), with .done for when it ends.
+ */
+function stage(id, token, { element = 'none', scale = 1, from = null, opts = null } = {}) {
+	if (!id || !token) return Object.assign(Promise.resolve(), { done: Promise.resolve() });
+	const c = center(token);
+	const run = playFx(id, { ...c, from: from ?? c, to: c, tokenSize: sizeOf(token), token, element, scale, ...(opts ? { opts } : {}) });
+	const hit = run?.hit ?? run ?? Promise.resolve();
+	return Object.assign(Promise.resolve(hit), { done: Promise.resolve(run) });
+}
+const lasts = (id, k = 1) => (id ? Math.min(2600, pixelDuration(id) * k) : 0);
+const feetOf = (t) => {
+	const c = center(t);
+	return { x: c.x, y: c.y + (t.h ?? g()) * 0.42 };
+};
 
 /* ------------------------------------------------------------------ */
-/*  The scenes                                                         */
+/*  The scenes: motion and timing; the stages are the player's to change */
 /* ------------------------------------------------------------------ */
 
 const SCENES = {
-	/** A rush of afterimage dash-slashes, then one giant cut */
-	async blitz({ src, targets, color }) {
+	/** Dash-strikes from all sides, then one last blow */
+	async blitz({ src, targets, S, el, scale }) {
 		const main = targets[0]?.token;
-		if (!src || !main) return SCENES.limits({ src, targets, color });
-		await I.chargeUp(src, { color, ms: 800 }).then((s) => s());
+		if (src) await stage(S.charge, src, { element: el, scale });
+		if (!src || !main) return;
 		const a = center(src);
 		const b = center(main);
-		const slashes = ['sf-slash', 'sf-slash-x', 'sf-slash-up', 'sf-slash-wide', 'sf-slash-combo'];
-		const stop = I.afterimages(src, 0, color);
-		for (let i = 0; i < 5; i++) {
-			const ang = (i / 5) * Math.PI * 2 + Math.random();
+		const trail = I.afterimages(src, 0, 0xffe2a0);
+		for (let i = 0; i < 4; i++) {
+			const ang = (i / 4) * Math.PI * 2 + 0.6;
 			const r = g() * 0.9;
-			const to = { x: b.x + Math.cos(ang) * r - a.x, y: b.y + Math.sin(ang) * r * 0.6 - a.y };
 			playSound('swoosh-grain', { volume: 0.7 });
-			await tweenOffset(src, to, 90);
-			playFx(slashes[i], at(main, { from: { x: b.x - Math.cos(ang) * g(), y: b.y - Math.sin(ang) * g() }, rotation: ang + Math.PI, scale: 1.2 }));
+			await tweenOffset(src, { x: b.x + Math.cos(ang) * r - a.x, y: b.y + Math.sin(ang) * r * 0.6 - a.y }, 90);
+			stage(S.main, main, { element: el, scale, from: { x: b.x + Math.cos(ang) * r, y: b.y + Math.sin(ang) * r * 0.6 } });
 			I.flashToken(main, 80);
-			I.debris(b, { color, count: 10, power: 0.8, kind: 'spark' });
 			I.shake(0.5, 120);
 			await hitstop(50);
+			await wait(120);
 		}
-		stop();
+		trail();
 		await tweenOffset(src, { x: b.x - a.x - g() * 0.9, y: b.y - a.y }, 120);
-		await wait(160);
 		playSound('critical-strike');
-		playFx('sf-slash-heavy', at(main, { scale: 2.2, rotation: -0.4 }));
-		I.screenFlash(0xffffff, 0.8, 300);
-		I.burstFlash(b, { color, size: 3 });
-		await hitstop(220);
+		await stage(S.finish, main, { element: el, scale: scale * 1.6 });
+		I.screenFlash(0xffffff, 0.6, 260);
+		await hitstop(200);
 		I.shake(3, 600);
 		knockback(main, 1, 0, 3);
-		I.shockwaves(b, { color, size: 2 });
 		await wait(300);
 		await tweenOffset(src, { x: 0, y: 0 }, 420);
 	},
 
-	/** Three dice tumble across the screen, then a jackpot */
-	async chance({ src, targets, color }) {
-		const c = src ? center(src) : null;
-		const circle = c ? I.runeCircle({ x: c.x, y: c.y + g() * 0.4 }, { color, size: 1.8 }) : null;
+	/** Three dice roll at the user's feet; the better the roll, the bigger the payoff */
+	async chance({ src, targets, S, el, scale }) {
+		const faces = [0, 1, 2].map(() => 1 + Math.floor(Math.random() * 6));
 		playSound('magic-sparkles');
-		const faces = await I.diceRoll({ color: hex(color) });
-		const odd = faces.filter((f) => f % 2).length;
+		if (src) await stage(S.charge, src, { element: el, scale: scale * 1.3, opts: { faces } });
 		const doubles = faces[0] === faces[1] && faces[1] === faces[2];
 		playSound(doubles ? 'dramatic-finish' : 'coin-impact');
-		if (src) {
-			playFx('sf-coins', at(src, { scale: 1.6 }));
-			playFx('sf-firework', at(src, { scale: 1.8 }));
-			I.burstFlash(c, { color, size: 2.4 });
-		}
-		// the luckier the roll looks, the bigger the payoff
+		if (src) stage(S.main, src, { element: el, scale: scale * (doubles ? 1.6 : 1.2) });
+		await wait(500);
 		const spots = targets.length ? targets.map((t) => t.token) : alliesOf(src);
 		for (const t of spots) {
-			await wait(120);
-			playFx(targets.length ? 'sf-impact-heavy' : 'sf-heal-burst', at(t, { scale: 1.3 + odd * 0.15 }));
-			I.impactRing(center(t), { color, size: 1.5 + odd * 0.3 });
+			stage(S.finish, t, { element: el, scale });
+			await wait(150);
 		}
-		if (doubles) I.screenFlash(color, 0.6, 400);
-		await wait(500);
-		await circle?.();
+		if (doubles) I.screenFlash(0xfff0b0, 0.5, 400);
+		await wait(lasts(S.finish, 0.5));
 	},
 
-	/** An alchemy circle, and gems and coins pouring out */
-	async cost({ src, color }) {
+	/** A circle opens under the user and the treasure pours out over the party */
+	async cost({ src, S, el, scale }) {
 		if (!src) return;
-		const c = center(src);
-		const circle = I.runeCircle({ x: c.x, y: c.y + g() * 0.4 }, { color, size: 2.2, spin: 1.8 });
 		playSound('buff-pickup');
-		await I.orbit(src, [color, 0xffd27a, 0xffffff], { ms: 900, count: 8 });
-		for (let i = 0; i < 4; i++) {
-			playFx(i % 2 ? 'sf-gem' : 'sf-coins', at(src, { scale: 1.2 + i * 0.25 }));
-			I.debris({ x: c.x, y: c.y - g() * 0.3 }, { color: i % 2 ? color : 0xffd27a, count: 14, power: 0.9, kind: 'spark' });
-			playSound('coin-impact', { volume: 0.6 });
-			await wait(220);
+		stage(S.charge, src, { element: el, scale });
+		await wait(Math.min(1200, lasts(S.charge, 0.4)));
+		await stage(S.main, src, { element: el, scale: scale * 1.3 });
+		playSound('coin-impact', { volume: 0.7 });
+		for (const t of alliesOf(src)) {
+			stage(S.finish, t, { element: el, scale });
+			await wait(120);
 		}
-		for (const t of alliesOf(src)) playFx('sf-sparkle', at(t, { scale: 1.2 }));
-		I.impactRing(c, { color, size: 2.2 });
-		await wait(500);
-		await circle();
+		await wait(lasts(S.finish, 0.5));
 	},
 
-	/** Two element orbs circle the user, then strike in turn; the user keeps a two-color aura */
-	async elements({ src, targets, types }) {
+	/** Both elements gather on the user, then strike the targets in turn; the user keeps the aura */
+	async elements({ src, targets, S, el, scale, types, plan }) {
 		const [a, b] = types.length >= 2 ? types : types.length === 1 ? [types[0], types[0] === 'fire' ? 'ice' : 'fire'] : ['fire', 'ice'];
-		const ca = colorOf(a);
-		const cb = colorOf(b);
 		if (src) {
 			playSound('energy-riser');
-			await I.orbit(src, [ca, cb], { ms: 1400, count: 6 });
-			I.burstFlash(center(src), { color: ca, size: 2 });
-			I.burstFlash(center(src), { color: cb, size: 1.4 });
+			stage(S.charge, src, { element: el !== 'none' ? el : a, scale });
+			await wait(500);
+			await stage(S.charge, src, { element: el !== 'none' ? el : b, scale: scale * 1.2 });
 		}
 		let i = 0;
+		const own = plan.spec?.zeroMain;
 		for (const t of targets) {
-			const el = i++ % 2 ? b : a;
-			if (src && t.token !== src) await I.blazingProjectile(center(src), center(t.token), { color: colorOf(el), size: 0.45, ms: 380 });
-			playFx(ELEMENT_HIT[el], at(t.token, { element: el, scale: 1.4 }));
-			I.shockwaves(center(t.token), { color: colorOf(el), size: 1.5, count: 2 });
+			const type = i++ % 2 ? b : a;
+			const id = own && own !== 'auto' ? (own === 'none' ? null : own) : ELEMENT_HIT[type];
+			if (src && t.token !== src) await I.blazingProjectile(center(src), center(t.token), { color: 0xffffff, size: 0.3, ms: 320 });
+			stage(id, t.token, { element: el !== 'none' ? el : type, scale: scale * 1.3 });
 			I.shake(1.2, 260);
-			await wait(160);
+			await wait(200);
 		}
-		if (src) {
-			await wait(300);
-			const settle = await I.gather(src, { color: ca, ms: 500, lift: 0.08 });
-			I.debris(center(src), { color: cb, count: 18, power: 0.4, kind: 'ember' });
-			settle();
-		}
+		if (src) await stage(S.finish, src, { element: el !== 'none' ? el : a, scale });
 	},
 
-	/** A transformation: the user grows, sigils of all four Attributes rise */
-	async limits({ src, color }) {
+	/** Power gathers, every Attribute rises, the user transforms */
+	async limits({ src, S, el, scale }) {
 		if (!src) return;
-		const settle = await I.chargeUp(src, { color, ms: 1300 });
 		playSound('high-powering-up');
-		const words = I.risingWords(src, ['DEX', 'INS', 'MIG', 'WLP'], { color: 0xffd27a, gap: 160 });
-		for (const id of ['sf-attack-up', 'sf-magic-up', 'sf-defense-up', 'sf-power-up']) {
-			playFx(id, at(src, { scale: 1.3 }));
-			await wait(170);
-		}
-		await words;
+		await stage(S.charge, src, { element: el, scale });
 		playSound('growing-strength');
-		await I.pulseScale(src, 1.3, 650);
-		I.screenFlash(color, 0.5, 300);
-		I.shockwaves(center(src), { color, size: 2.2 });
+		stage(S.main, src, { element: el, scale: scale * 1.2 });
+		await wait(1100);
+		I.pulseScale(src, 1.25, 600);
+		await stage(S.finish, src, { element: el, scale: scale * 1.4 });
+		I.screenFlash(0xffd27a, 0.4, 300);
 		I.shake(2, 400);
-		settle();
-		await wait(400);
+		await wait(500);
 	},
 
-	/** Magic circles above the targets, light falling from the sky */
-	async magic({ src, targets, color }) {
-		if (src) {
-			playFx('sf-glyph', at(src, { scale: 1.6 }));
-			playSound('casting-buff');
-			await I.orbit(src, [color, 0xffffff], { ms: 900, count: 5 });
-		}
+	/** A spell gathers on the user; circles open under the targets and the sky falls on them */
+	async magic({ src, targets, S, el, scale }) {
+		playSound('casting-buff');
+		if (src) await stage(S.charge, src, { element: el, scale });
 		const spots = targets.length ? targets.map((t) => t.token) : src ? [src] : [];
-		const circles = spots.map((t) => I.runeCircle({ x: center(t).x, y: center(t).y + g() * 0.3 }, { color, size: 1.6, spin: 2 }));
-		await wait(500);
-		for (const t of spots) {
-			playSound('jacobs-ladder', { volume: 0.6 });
-			I.beamDown(center(t), { color, width: 0.9, ms: 900 });
-			await wait(160);
-			playFx(targets.length ? 'sf-explosion-big' : 'sf-magic-up', at(t, { scale: 1.5 }));
-			I.impactRing(center(t), { color, size: 2 });
-		}
+		playSound('jacobs-ladder', { volume: 0.7 });
+		const hits = spots.map((t) => stage(S.main, t, { element: el, scale: scale * 1.2 }));
+		await Promise.all(hits);
 		I.shake(1.6, 400);
-		await wait(600);
-		await Promise.all(circles.map((c) => c()));
-	},
-
-	/** A giant clock spins and fills, and time ripples out */
-	async objective({ src, color }) {
-		playSound('teleport-downer');
-		const clock = I.clockSpin({ color: hex(color), fill: 3 });
-		if (src) for (let i = 0; i < 3; i++) setTimeout(() => I.impactRing(center(src), { color, size: 2 + i, ms: 700 }), 350 + i * 300);
-		await clock;
-		if (src) {
-			playFx('sf-twinkle', at(src, { scale: 1.6 }));
-			I.shockwaves(center(src), { color, size: 3, count: 3, gap: 200 });
-		}
-		await wait(500);
-	},
-
-	/** Light from above, feathers falling, every ally healed */
-	async remedy({ src, targets, color }) {
-		const allies = targets.length ? targets.map((t) => t.token) : alliesOf(src);
-		if (src && !allies.includes(src)) allies.unshift(src);
-		playSound('healing-gusts');
-		const fall = I.feathers(allies.map((t) => center(t)), { color: 0xfff6dc, ms: 1800 });
-		for (const t of allies) {
-			I.beamDown(center(t), { color, width: 0.8, ms: 1100 });
+		for (const t of spots) {
+			stage(S.finish, t, { element: el, scale });
 			await wait(140);
 		}
-		await wait(450);
-		for (const t of allies) {
-			playFx('sf-heal-burst', at(t, { scale: 1.3 }));
-			I.impactRing(center(t), { color: 0x9dffb0, size: 1.3 });
-		}
-		playSound('simple-heal');
-		await fall;
+		await wait(lasts(S.finish, 0.6));
 	},
 
-	/** Warning circles on every target, then all of them struck at once, with lingering statuses */
-	async scourge({ targets, types, color }) {
-		const el = types[0] ?? 'dark';
-		const c = types[0] ? colorOf(el) : color;
-		const spots = targets.map((t) => t.token);
-		playSound('panic-energy');
-		await Promise.all(spots.map((t) => I.telegraph(center(t), { color: c, size: 1.6, ms: 800 })));
-		playSound('magisplosion');
-		for (const t of spots) {
-			playFx(ELEMENT_HIT[el] ?? 'sf-explosion-big', at(t, { element: el, scale: 1.5 }));
-			I.flashToken(t, 120);
-		}
-		I.screenFlash(c, 0.6, 300);
-		I.shake(2.6, 500);
-		await hitstop(160);
-		await wait(500);
-		for (const t of spots) playFx(Math.random() < 0.5 ? 'sf-dizzy' : 'sf-curse', at(t));
+	/** The clock: time slows, stops, and breaks */
+	async objective({ src, S, el, scale }) {
+		if (!src) return;
+		playSound('teleport-downer');
+		await stage(S.charge, src, { element: el, scale: scale * 1.4 });
+		await wait(Math.max(0, lasts(S.charge, 0.6) - 1700));
+		playSound('magisplosion', { volume: 0.7 });
+		await stage(S.main, src, { element: el, scale: scale * 1.3 });
+		stage(S.finish, src, { element: el, scale });
 		await wait(700);
 	},
 
-	/** A hexagonal dome spreads over the party */
-	async shield({ src, color }) {
-		const allies = alliesOf(src);
+	/** Light on every ally, healing, and feathers over the user */
+	async remedy({ src, targets, S, el, scale }) {
+		const allies = targets.length ? targets.map((t) => t.token) : alliesOf(src);
 		if (src && !allies.includes(src)) allies.unshift(src);
-		if (!allies.length) return;
-		const cs = allies.map((t) => center(t));
-		const mid = { x: cs.reduce((n, p) => n + p.x, 0) / cs.length, y: cs.reduce((n, p) => n + p.y, 0) / cs.length };
-		const radius = Math.max(2, ...cs.map((p) => Math.hypot(p.x - mid.x, p.y - mid.y) / g() + 1.2));
-		playSound('mecha-barrier-fail', { volume: 0.5 });
-		playSound('appear-firewall');
-		const d = I.dome(mid, { radius, color, ms: 2000 });
-		await wait(400);
+		playSound('healing-gusts');
 		for (const t of allies) {
-			playFx('sf-shield', at(t, { scale: 1.3 }));
-			await wait(90);
+			stage(S.charge, t, { element: el, scale });
+			await wait(120);
 		}
-		await d;
+		await wait(Math.min(1000, lasts(S.charge, 0.3)));
+		playSound('simple-heal');
+		await Promise.all(allies.map((t) => stage(S.main, t, { element: el, scale })));
+		if (src) await stage(S.finish, src, { element: el, scale: scale * 1.2 });
+		await wait(600);
 	},
 
-	/** A triangle links the user and two allies; three beams converge on the target */
-	async triangle({ src, targets, color }) {
+	/** A storm gathers, every target is marked, their element strikes them all at once, statuses linger */
+	async scourge({ targets, S, el, scale, types }) {
+		const type = types[0] ?? 'dark';
+		const spots = targets.map((t) => t.token);
+		playSound('panic-energy');
+		for (const t of spots) stage(S.charge, t, { element: el, scale });
+		await wait(600);
+		await Promise.all(spots.map((t) => stage(S.main, t, { element: el, scale })));
+		playSound('magisplosion');
+		for (const t of spots) stage(ELEMENT_HIT[type], t, { element: el !== 'none' ? el : type, scale: scale * 1.3 });
+		I.screenFlash(0xffffff, 0.4, 260);
+		I.shake(2.6, 500);
+		await hitstop(150);
+		await wait(400);
+		for (const t of spots) stage(S.finish, t, { element: el, scale });
+		await wait(lasts(S.finish, 0.5));
+	},
+
+	/** A barrier on the user, then over every ally */
+	async shield({ src, S, el, scale }) {
+		const allies = alliesOf(src);
+		if (src && !allies.includes(src)) allies.unshift(src);
+		playSound('appear-firewall');
+		if (src) await stage(S.charge, src, { element: el, scale });
+		for (const t of allies) {
+			stage(S.main, t, { element: el, scale });
+			await wait(110);
+		}
+		await wait(900);
+		for (const t of allies) stage(S.finish, t, { element: el, scale });
+		await wait(600);
+	},
+
+	/** Three heroes linked by a triangle on the floor, three beams meeting on the target */
+	async triangle({ src, targets, S, el, scale }) {
 		const main = targets[0]?.token;
 		const team = [src, ...alliesOf(src).filter((t) => t !== src)].filter(Boolean).slice(0, 3);
 		if (!team.length) return;
-		const pts = team.map((t) => center(t));
 		playSound('energy-crystal');
-		if (pts.length >= 2) await I.linkLines(pts, { color, ms: 900, closed: pts.length === 3 });
-		const colors = [color, 0x7fe0ff, 0xffd27a];
-		await Promise.all(team.map((t, i) => I.gather(t, { color: colors[i % 3], ms: 450, lift: 0.08 }).then((s) => s())));
+		// the triangle stands on the centre of the three, its corners on their feet
+		const feet = team.map(feetOf);
+		await stage(S.charge, team[0], { element: el, scale, opts: feet.length === 3 ? { points: feet } : null });
 		if (!main) return;
-		const b = center(main);
 		playSound('mecha-white-laser');
-		await Promise.all(team.map((t, i) => I.blazingProjectile(center(t), b, { color: colors[i % 3], size: 0.35, ms: 420 })));
-		playFx('sf-explosion-big', at(main, { scale: 1.8 }));
-		I.burstFlash(b, { color, size: 3 });
-		I.shockwaves(b, { color, size: 2 });
+		await Promise.all(team.map((t) => stage(S.main, main, { element: el, scale, from: center(t) })));
+		await stage(S.finish, main, { element: el, scale: scale * 1.8 });
 		I.shake(2.4, 500);
-		await hitstop(160);
+		await hitstop(150);
 		await wait(400);
 	},
 };
 
 /**
- * Play a Zero Power. The finale wrapper (bars, darkness, cut-in) is done by the caller; this plays the scene.
- * @returns {Promise<boolean>} false when the effect has no scene (the caller then plays the generic limit break)
+ * Play a Zero Power's scene. The caller has done the bars, darkness and cut-in.
+ * @returns {Promise<boolean>} false when there is no scene for this key
  */
 export async function playZero(key, { plan, src, targets }) {
 	const scene = SCENES[key];
 	if (!scene) return false;
-	const color = ZERO_EFFECTS[key].color;
-	await scene({ plan, src, targets, color, types: plan.zeroTypes ?? [] });
-	const spots = (targets.length ? targets.map((t) => t.token) : [src]).filter(Boolean);
-	await I.aftermath(spots.map((t) => center(t)), { color, ms: 700 });
+	const spec = plan.spec ?? {};
+	const S = Object.fromEntries(ZERO_STAGES.map((s) => [s, stageOf(spec, key, s)]));
+	const el = spec.zeroColor || 'none';
+	await scene({ plan, src, targets, S, el, scale: Number(spec.scale) || 1, types: plan.zeroTypes ?? [] });
 	return true;
 }
-
-export { fxDuration };

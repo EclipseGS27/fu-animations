@@ -494,6 +494,8 @@ export function playPixel(id, at) {
 			target: { ...size(tTok), shape: shapeOf(tTok, artPx) },
 			source: from && sTok ? { ...size(sTok), shape: shapeOf(sTok, artPx) } : size(sTok),
 		});
+		// per-play options for library effects (dice faces, the corners of a triangle on the map...)
+		P.opts = at.opts ?? {};
 		const run = new PixelRun(id, P, { onHit: hitResolve });
 		const b = bounds(def, P);
 		const fb = frame(b);

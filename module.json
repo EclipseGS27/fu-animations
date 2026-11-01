@@ -3,7 +3,7 @@
   "name": "fu-animations",
   "title": "Fabula Ultima Battle Animations",
   "description": "Animations for every Project FU class ability, spell, weapon attack and Core item, and every NPC attack and spell in the Core Rulebook, Bestiary vol. 1 and the three Atlases, all drawn in code as pixel art (after Sprite Fusion's open source VFX library), or as JB2A effects. Melee attackers dash to their target and back, spells fly and burst on whoever is targeted, combatants hover while they wait and show their conditions. Sound effects play with each animation. Every animation and sound can be changed per item or for the whole world.",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "authors": [
     {
       "name": "George Sowidan"

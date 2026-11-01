@@ -5,7 +5,7 @@ import { autoSounds, playSound, soundGroups, soundLabel } from './audio.mjs';
 import { IMPACT_FIELDS, autoText, feelOf } from './feel.mjs';
 import { cutIn } from './impact.mjs';
 import { PIXEL, PixelPreview, isPixel, pixelDuration } from './pixel.mjs';
-import { ZERO_EFFECTS, zeroKeyOf, zeroTypesOf } from './zero.mjs';
+import { ELEMENT_HIT, ZERO_EFFECTS, ZERO_STAGES, stageField, stageOf, zeroKeyOf, zeroTypesOf } from './zero.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -193,6 +193,8 @@ export class AnimationEditor extends ApplicationV2 {
 		actions: {
 			playSound: AnimationEditor.#onPlaySound,
 			pick: AnimationEditor.#onPick,
+			pickZero: AnimationEditor.#onPickZero,
+			resetZero: AnimationEditor.#onResetZero,
 			pickPortrait: AnimationEditor.#onPickPortrait,
 			clearPortrait: AnimationEditor.#onClearPortrait,
 			previewCutin: AnimationEditor.#onPreviewCutin,
@@ -276,16 +278,17 @@ export class AnimationEditor extends ApplicationV2 {
 				</div>
 				<label class="style"><span>Style</span><select data-k="style">${opts(STYLES, s.style)}</select></label>
 			</header>
+			${none ? '' : this.#isLimit() ? this.#limitHTML() : ''}
 			${
 				none
 					? '<p class="empty">No animation. Pick a style to give it one.</p>'
-					: `<section class="slots n${slots.length}">${slots.map(([f, l]) => this.#slot(f, l)).join('')}</section>
-			<p class="hint">Click a box to choose its effect. Each one loops here as it will play.</p>
-			<div class="row">
+					: `${this.#zeroKey() ? '' : `<section class="slots n${slots.length}">${slots.map(([f, l]) => this.#slot(f, l)).join('')}</section>
+			<p class="hint">Click a box to choose its effect. Each one loops here as it will play.</p>`}
+			<div class="row ${this.#zeroKey() ? 'zsize' : ''}">
 				<div class="fld colorpick"><span>Color</span><div class="in"><select data-k="element" aria-label="Color">${opts({ ...ELEMENTS, custom: 'Custom color…' }, colorKey)}</select>${isHexColor(s.element) ? `<input type="color" data-k="elementColor" value="${esc(s.element)}" aria-label="Custom color" data-tooltip="Any color: recolors this animation in every preset, JB2A Free included">` : ''}</div></div>
 				<label class="fld size"><span>Size <output>${Number(s.scale ?? 1).toFixed(1)}×</output></span><input type="range" data-k="scale" min="0.5" max="2.5" step="0.1" value="${s.scale ?? 1}"></label>
 			</div>
-			<div class="row">
+			<div class="row ${this.#zeroKey() ? 'hide' : ''}">
 				<div class="fld"><span>Sound on use</span><div class="in"><select data-k="castSound">${this.#soundOptions(s.castSound, auto.cast ?? auto.projectile)}</select><button type="button" class="play" data-action="playSound" data-which="cast" aria-label="Play the use sound" data-tooltip="Play">▶</button></div></div>
 				<div class="fld"><span>Sound on hit</span><div class="in"><select data-k="hitSound">${this.#soundOptions(s.hitSound, auto.hit)}</select><button type="button" class="play" data-action="playSound" data-which="hit" aria-label="Play the hit sound" data-tooltip="Play">▶</button></div></div>
 			</div>
@@ -345,14 +348,81 @@ export class AnimationEditor extends ApplicationV2 {
 		return feelOf({ spec: { ...this.spec, ...over }, offensive, element: this.previewElement, itemType: itemKind(this.item) ?? (this.fuid && ABILITIES[this.fuid]?.group === 'Heroic Skills' ? 'heroic' : null), crit: false, targets: [{}] }, { targets: 1, ignoreSettings: true, ignoreBoss: true });
 	}
 
-	/** Which limit-break scene plays: read from the Zero Power, one of the eleven, or the general one */
-	#zeroHTML() {
+	/** A limit break: a Zero Power, or anything set to the Limit break impact level */
+	#isLimit() {
+		return itemKind(this.item) === 'zeroPower' || this.#feel().base === 'ultimate';
+	}
+
+	/** The Zero Power scene that will play, or null for the general limit break */
+	#zeroKey() {
+		if (!this.#isLimit()) return null;
+		const pick = this.spec.zero ?? 'auto';
+		if (pick === 'generic') return null;
+		if (ZERO_EFFECTS[pick]) return pick;
 		const found = this.item ? zeroKeyOf(this.item) : null;
+		return found;
+	}
+
+	/** The effect a stage card shows: the player's, else the scene's (Elements' main follows its first element) */
+	#stageId(key, st) {
+		const id = stageOf(this.spec, key, st);
+		if (id === 'auto') return ELEMENT_HIT[(this.item ? zeroTypesOf(this.item) : [])[0] ?? 'fire'];
+		return id;
+	}
+
+	/** Limit break: which scene, its color, and its three stages, each a live preview to click and change */
+	#limitHTML() {
+		const found = this.item ? zeroKeyOf(this.item) : null;
+		const key = this.#zeroKey();
 		const cur = this.spec.zero ?? 'auto';
 		const o = (v, l) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
-		return `<label class="zero"><span>Limit break scene</span><select data-k="zero">${o('auto', `Automatic: ${found ? ZERO_EFFECTS[found].label : 'general limit break'}`)}${Object.entries(ZERO_EFFECTS)
-			.map(([k, z]) => o(k, z.label))
-			.join('')}${o('generic', 'General limit break (uses the effects above)')}</select></label>`;
+		const z = key ? ZERO_EFFECTS[key] : null;
+		const color = this.spec.zeroColor;
+		const sceneHex = z ? `#${z.color.toString(16).padStart(6, '0')}` : '#ffffff';
+		const cards = z
+			? ZERO_STAGES.map((st) => {
+					const field = stageField(st);
+					const id = this.#stageId(key, st);
+					const own = this.spec[field];
+					const name = own === 'none' ? 'None' : id ? fxLabel(id) : 'None';
+					return `<div class="zcard"><button type="button" class="slot ${id ? '' : 'empty'}" data-action="pickZero" data-stage="${st}" aria-label="${esc(z.roles[st])}: ${esc(name)}. Choose">
+						<span class="pv"><canvas width="150" height="150" data-prev="${field}"></canvas>${id ? '' : '<i class="fa-solid fa-plus"></i>'}</span>
+						<small>${esc(st)}</small><b>${esc(name)}</b><em>${esc(z.roles[st])}</em>
+					</button>${own ? `<button type="button" class="zreset" data-action="resetZero" data-stage="${st}" data-tooltip="Back to the scene's own">↺</button>` : ''}</div>`;
+				}).join('')
+			: '';
+		return `<section class="limit">
+			<div class="row">
+				<label class="fld"><span>Limit break scene</span><select data-k="zero">${o('auto', `Automatic: ${found ? ZERO_EFFECTS[found].label : 'general limit break'}`)}${Object.entries(ZERO_EFFECTS)
+					.map(([k, x]) => o(k, x.label))
+					.join('')}${o('generic', 'General limit break (the effects below)')}</select></label>
+				${z ? `<div class="fld colorpick"><span>Color</span><div class="in"><select data-k="zeroColorMode" aria-label="Color"><option value="" ${color ? '' : 'selected'}>Scene colors</option><option value="custom" ${color ? 'selected' : ''}>Custom color…</option></select>${color ? `<input type="color" data-k="zeroColor" value="${esc(color)}" aria-label="Custom color">` : ''}</div></div>` : ''}
+			</div>
+			${z ? `<section class="slots n3 zero">${cards}</section><p class="hint">${esc(z.label)}: click a stage to choose any effect for it (or None). The scene keeps its own motion and timing; Size and the Impact settings below still apply.</p>` : ''}
+		</section>`;
+	}
+
+	static #onPickZero(event, target) {
+		const key = this.#zeroKey();
+		if (!key) return;
+		const st = target.dataset.stage;
+		const field = stageField(st);
+		EffectPicker.open({
+			title: `${this.name}: ${ZERO_EFFECTS[key].roles[st]}`,
+			current: this.#stageId(key, st) ?? '',
+			element: this.spec.zeroColor || 'none',
+			groups: fxGroups(),
+			near: this,
+			onPick: (id) => {
+				this.spec[field] = id || 'none';
+				this.render();
+			},
+		});
+	}
+
+	static #onResetZero(event, target) {
+		delete this.spec[stageField(target.dataset.stage)];
+		this.render();
 	}
 
 	#impactHTML() {
@@ -379,7 +449,6 @@ export class AnimationEditor extends ApplicationV2 {
 				${field('camera')}${field('dim')}${field('windup')}
 				${field('debris')}${field('scorch')}${field('cutin')}
 			</div>
-			${f.level === 'ultimate' || f.base === 'ultimate' ? this.#zeroHTML() : ''}
 			<div class="cutin ${showCut ? '' : 'off'}">
 				<label class="wide"><span>Cut-in title</span><input type="text" data-k="cutinText" value="${esc(this.spec.cutinText ?? '')}" placeholder="${esc(this.name)}"></label>
 				<label><span>Color</span><input type="color" data-k="cutinColor" value="${esc(color)}"></label>
@@ -460,6 +529,15 @@ export class AnimationEditor extends ApplicationV2 {
 					this.spec.element = val;
 					return this.#syncPreviews();
 				}
+				if (k === 'zeroColorMode') {
+					if (val === 'custom') this.spec.zeroColor = `#${(ZERO_EFFECTS[this.#zeroKey()]?.color ?? 0xffffff).toString(16).padStart(6, '0')}`;
+					else delete this.spec.zeroColor;
+					return this.render();
+				}
+				if (k === 'zeroColor') {
+					this.spec.zeroColor = val;
+					return this.#syncPreviews();
+				}
 				if (k === 'scale') {
 					val = Number(val);
 					el.closest('label').querySelector('output').textContent = `${val.toFixed(1)}×`;
@@ -501,7 +579,13 @@ export class AnimationEditor extends ApplicationV2 {
 
 	#syncPreviews() {
 		const el = this.previewElement;
+		const zk = this.#zeroKey();
 		for (const p of this.previews) {
+			const st = ZERO_STAGES.find((x) => stageField(x) === p.key);
+			if (st) {
+				p.set(zk ? this.#stageId(zk, st) : null, this.spec.zeroColor || 'none');
+				continue;
+			}
 			const id = this.spec[p.key];
 			p.set(id, p.key === 'after' ? (this.spec.afterElement ?? 'none') : el);
 		}

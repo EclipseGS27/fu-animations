@@ -48,19 +48,21 @@ All 446 compendium entries and 611 bestiary attacks play in pixel art:
   - fire, magic orbs and other projectiles fly as blazing bolts with tails, sized by the impact;
   - heavy spells darken the scene with the fighters spotlit, the caster rises while power gathers, the camera leans in and the ground keeps a scorch mark for a moment;
   - heroic moves open with a full-screen **cut-in** (character portrait and move name), and a **Meteor** projectile falls from the sky onto a warning circle.
-  - **Limit break**, one level above Heroic: cinema bars slide in and the scene goes dark, a limit-break cut-in crashes across the screen (white flash, crossing bands, light rays, "ZERO POWER" over the move name), then power gathers on the user (a turning magic circle, a pillar of light, motes spiralling in, focus lines, the user lifting and trembling) while the camera leans in. A white-out, and the move lands at one and a half times its size with rolling shockwaves, an earthquake shake and embers drifting up after. **Zero Powers** play this way on their own, and each of the eleven zero effects from the High Fantasy Atlas has its own scene after the cut-in (which names the effect):
-    - **Zero Blitz**: an afterimage rush of five dash-slashes around the target, then one giant cut.
-    - **Zero Chance**: three giant dice tumble across the screen and land, then a jackpot of coins and fireworks.
-    - **Zero Cost**: an alchemy circle, orbiting lights, and gems and coins pouring out over the party.
-    - **Zero Elements**: two orbs of the power's chosen damage types circle the user, then strike the targets in turn.
-    - **Zero Limits**: a transformation: the user grows, and DEX, INS, MIG and WLP rise from them with power-up bursts.
-    - **Zero Magic**: magic circles open above the targets and columns of light fall from the sky.
-    - **Zero Objective**: a giant clock spins and fills three sections while time ripples out.
-    - **Zero Remedy**: light falls on every ally with drifting feathers, then everyone is healed.
-    - **Zero Scourge**: warning circles under every target, then all of them struck at once in the chosen type, with lingering statuses.
-    - **Zero Shield**: a hexagonal dome spreads over the whole party.
-    - **Zero Triangle**: a glowing triangle links the user and two allies, and three beams converge on the target.
-    Players name their own powers, so the effect is read from the power's Zero effect field, then its text, then its name; the editor's Impact section has a **Limit break scene** picker to choose another one (or the general limit break). Any ability can be set to Limit break too.
+  - **Limit break**, one level above Heroic: cinema bars slide in and the scene goes dark, a limit-break cut-in crashes across the screen (white flash, crossing bands, light rays, "ZERO POWER" over the move name), then power gathers on the user (a turning magic circle, a pillar of light, motes spiralling in, focus lines, the user lifting and trembling) while the camera leans in. A white-out, and the move lands at one and a half times its size with rolling shockwaves, an earthquake shake and embers drifting up after. **Zero Powers** play this way on their own, and each of the eleven zero effects from the High Fantasy Atlas has its own scene after the cut-in (which names the effect), drawn with pixel art effects from the [pixelfx](https://github.com/patch-gg/pixelfx) library:
+    - **Zero Blitz**: power gathers, then four afterimage dash-strikes from all sides (dagger flurries) and a critical burst.
+    - **Zero Chance**: three dice tumble and land at the user's feet (a roll of doubles pays out bigger), fireworks over the user, coins on everyone.
+    - **Zero Cost**: a magic circle opens, a treasure chest bursts open in a column of light, coins shower over the party.
+    - **Zero Elements**: the power's two elements charge in turn, then strike the targets one after the other; the user keeps the aura.
+    - **Zero Limits**: a lightning charge-up, DEX/INS/MIG/WLP badges rise one by one, a power star as the user grows.
+    - **Zero Magic**: a spell charges on the user, magic circles fire columns of light up from every target, stars fall on them.
+    - **Zero Objective**: a clock face springs open, ticks slower and slower, freezes and shatters.
+    - **Zero Remedy**: holy pillars on every ally, healing rings, a burst of feathers.
+    - **Zero Scourge**: storm clouds over the targets, a hex sigil on each, their element strikes all at once, curses linger.
+    - **Zero Shield**: a divine shield on the user, then a force-field dome over every ally.
+    - **Zero Triangle**: seals bloom at the feet of the user and two allies and light links them into a triangle, then three arcane beams converge on the target.
+    Players name their own powers, so the effect is read from the power's Zero effect field, then its text, then its name.
+  - **Editing a Zero Power**: the editor shows a **Limit break** section for Zero Powers (and anything set to Limit break): the scene (Automatic, any of the eleven, or the general limit break), a color (the scene's own palettes or any custom color, which recolors all of it), and the scene's three stages, **charge**, **main** and **finish**, as live previews. Click a stage to pick any effect for it from the grid (or None); ↺ puts back the scene's own. The scene keeps its motion and timing; Size and the Impact settings (cut-in title, color, portrait) still apply. Any ability can be set to Limit break too.
+  - 25 more pixelfx effects (and three new ones made for these scenes: a dice roll, a trinity link and a stat rise) are in the effect grid under **Pixel Limit Break**, for any animation.
   - **Bosses**: champions and villains hit one level harder. They wind up with a red flare and a magic circle at their feet, their biggest moves get a red cut-in ("CHAMPION", or the villain's rank), and red shockwaves roll out where they land. A world setting turns this off.
   - Automatic levels: Zero Powers are Limit breaks, Heroic Skills are Heroic, spells on two or more targets are Heavy, attacks and other spells are Normal, support and self effects are Light. **Critical hits go one level up** (a crit sword swing lands like a heavy blow); fumbles drop to Light.
 - **Damage numbers**: when damage is applied, the number slams onto the token and bounces: gold and larger after a critical, with the element and the Affinity that applied under it (VULNERABLE in orange, RESISTED in grey-blue, ABSORBED as green healing), IMMUNE when nothing gets through, green for healing. A miss shows MISS as the target dodges. Several numbers on one token stack instead of overlapping. They replace the system's plain "-12 HP" text, and with Fabula Ultima Battle UI installed they replace its numbers too.
@@ -96,7 +98,7 @@ World: melee attacks dash to the target, animate homebrew abilities, the ability
 ## Credits
 - Pixel Combat sound effects - Helton Yan
 - JB2A preset: plays effects from JB2A - Jules and Ben's Animated Assets (not included; install their module)
-- Original preset: breath, jet stream, whirlwind, spirit wisps and smoke puff from pixelfx (https://github.com/patch-gg/pixelfx), MIT License, Copyright (c) 2026 Patch and Hugo Duprez. Included in `scripts/pfx/` with the license next to it.
+- pixelfx (https://github.com/patch-gg/pixelfx), MIT License, Copyright (c) 2026 Patch and Hugo Duprez: breath, jet stream, whirlwind, spirit wisps, smoke puff and the 25 Pixel Limit Break effects used by the Zero Power scenes, plus three made for them with its method (dice roll, trinity link, stat rise). Included in `scripts/pfx/` with the license next to it.
 - Original preset: Sprite Fusion's open source pixel art VFX (https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez. Included in `scripts/sf/` (converted to JavaScript), with the license next to them.
 
 The sound pack forbids redistributing its files. Keep this module private while the sfx folder is inside it.
