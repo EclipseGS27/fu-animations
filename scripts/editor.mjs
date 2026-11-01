@@ -38,6 +38,77 @@ function cssFilter(fx, element) {
 	return f;
 }
 
+/* JB2A clips are big videos served by Foundry: keep the few in use instead of fetching them again on every
+   re-render, and remember still frames so the picker opens instantly the second time. */
+const VIDEOS = new Map(); // url -> <video>, most recent last
+const STILLS = new Map(); // "id|element" (pixel) or "id" (JB2A) -> small canvas
+const MAX_VIDEOS = 6;
+
+function jbUrl(id) {
+	const fx = JBFX[id];
+	if (!fx || !jbModule()) return null;
+	const file = fx.file ?? (fx.variants.find((x) => x.ft === 30) ?? fx.variants[0]).file;
+	return `modules/${jbModule()}/${file}`;
+}
+
+/** A looping muted video for a JB2A clip, shared between the editor's previews */
+function pooledVideo(url) {
+	let v = VIDEOS.get(url);
+	if (v) VIDEOS.delete(url);
+	else v = Object.assign(document.createElement('video'), { muted: true, loop: true, playsInline: true, preload: 'auto', src: url });
+	VIDEOS.set(url, v);
+	while (VIDEOS.size > MAX_VIDEOS) {
+		const [old, ov] = VIDEOS.entries().next().value;
+		VIDEOS.delete(old);
+		ov.pause();
+		ov.removeAttribute('src');
+		ov.load();
+	}
+	return v;
+}
+
+function copyCanvas(src) {
+	const c = document.createElement('canvas');
+	c.width = src.width;
+	c.height = src.height;
+	c.getContext('2d').drawImage(src, 0, 0);
+	return c;
+}
+
+const once = (el, ev, ms = 8000) =>
+	new Promise((res, rej) => {
+		const t = setTimeout(() => rej(new Error('timeout')), ms);
+		el.addEventListener(ev, () => (clearTimeout(t), res()), { once: true });
+		el.addEventListener('error', () => (clearTimeout(t), rej(new Error('error'))), { once: true });
+	});
+
+/** One frame of a JB2A clip (around where it hits), loaded once and kept */
+async function jbStill(id, size) {
+	if (STILLS.has(id)) return STILLS.get(id);
+	const url = jbUrl(id);
+	if (!url) return null;
+	const v = Object.assign(document.createElement('video'), { muted: true, playsInline: true, preload: 'auto', src: url });
+	try {
+		await once(v, 'loadeddata');
+		const fx = JBFX[id];
+		v.currentTime = Math.max(0, (v.duration || (fx.dur ?? 1000) / 1000) * (fx.hitAt ?? 0.45));
+		await once(v, 'seeked');
+		const c = document.createElement('canvas');
+		c.width = c.height = size;
+		const k = Math.min(size / v.videoWidth, size / v.videoHeight) * (fx.mode === 'point' ? 0.95 : 1);
+		const w = v.videoWidth * k;
+		const h = v.videoHeight * k;
+		c.getContext('2d').drawImage(v, (size - w) / 2, (size - h) / 2, w, h);
+		STILLS.set(id, c);
+		return c;
+	} catch {
+		return null;
+	} finally {
+		v.removeAttribute('src');
+		v.load();
+	}
+}
+
 class Preview {
 	constructor(canvasEl) {
 		this.el = canvasEl;
@@ -50,7 +121,7 @@ class Preview {
 		if (id !== this.id) this.start = performance.now();
 		this.id = id;
 		this.element = element;
-		this.el.style.filter = isPixel(id) ? (PIXEL[id].ramp ? 'none' : cssFilter(PIXEL[id], element)) : cssFilter(JBFX[id], element);
+		this.el.style.filter = !id ? 'none' : isPixel(id) ? (PIXEL[id].ramp ? 'none' : cssFilter(PIXEL[id], element)) : cssFilter(JBFX[id], element);
 		if (isPixel(id)) {
 			this.pixel ??= new PixelPreview(this.el);
 			this.pixel.set(id, element);
@@ -58,35 +129,24 @@ class Preview {
 		this.#video(id);
 	}
 
-	/** JB2A effects preview from their video */
+	/** JB2A effects preview from their video (shared, so a re-render doesn't download it again) */
 	#video(id) {
-		const fx = JBFX[id];
-		if (!fx || !jbModule()) {
-			if (this.vid) {
-				this.vid.pause();
-				this.vid.removeAttribute('src');
-				this.vid = null;
-			}
+		const url = isJb(id) ? jbUrl(id) : null;
+		if (!url) {
+			this.vid?.pause();
+			this.vid = null;
 			return;
 		}
-		const file = fx.file ?? (fx.variants.find((x) => x.ft === 30) ?? fx.variants[0]).file;
-		const url = `modules/${jbModule()}/${file}`;
 		if (this.vid?.dataset.url === url) return;
-		if (!this.vid) {
-			this.vid = document.createElement('video');
-			this.vid.muted = true;
-			this.vid.loop = true;
-			this.vid.playsInline = true;
-		}
+		this.vid = pooledVideo(url);
 		this.vid.dataset.url = url;
-		this.vid.src = url;
 		this.vid.play().catch(() => {});
 	}
 
 	draw = () => {
 		this.raf = requestAnimationFrame(this.draw);
+		if (!this.id || document.hidden) return;
 		const { ctx, el } = this;
-		ctx.clearRect(0, 0, el.width, el.height);
 		if (isPixel(this.id)) {
 			const t = performance.now();
 			const dt = this.lastPixel ? (t - this.lastPixel) / 1000 : 1 / 60;
@@ -94,25 +154,28 @@ class Preview {
 			this.pixel?.frame(dt);
 			return;
 		}
+		ctx.clearRect(0, 0, el.width, el.height);
 		if (isJb(this.id)) {
 			const vd = this.vid;
-			if (!vd || vd.readyState < 2) return;
+			if (!vd || vd.readyState < 2) {
+				// while the clip loads, show its still if the picker made one
+				const st = STILLS.get(this.id);
+				if (st) ctx.drawImage(st, 0, 0, el.width, el.height);
+				return;
+			}
 			ctx.imageSmoothingEnabled = true;
 			ctx.globalCompositeOperation = 'source-over';
 			const s = Math.min(el.width / vd.videoWidth, el.height / vd.videoHeight) * (JBFX[this.id].mode === 'point' ? 0.95 : 1);
 			const w = vd.videoWidth * s;
 			const h = vd.videoHeight * s;
 			ctx.drawImage(vd, (el.width - w) / 2, (el.height - h) / 2, w, h);
-			return;
 		}
 	};
 	stop() {
 		this.stopped = true;
-		if (this.vid) {
-			this.vid.pause();
-			this.vid.removeAttribute('src');
-			this.vid = null;
-		}
+		// pooled videos stay loaded for the next render; only pause them
+		this.vid?.pause();
+		this.vid = null;
 		cancelAnimationFrame(this.raf);
 	}
 }
@@ -125,7 +188,7 @@ export class AnimationEditor extends ApplicationV2 {
 	static DEFAULT_OPTIONS = {
 		classes: ['fua-app', 'fua-editor'],
 		window: { title: 'Animation', icon: 'fa-solid fa-wand-sparkles', resizable: true },
-		position: { width: 560, height: 'auto' },
+		position: { width: 620, height: 'auto' },
 		actions: {
 			playSound: AnimationEditor.#onPlaySound,
 			pick: AnimationEditor.#onPick,
@@ -189,43 +252,57 @@ export class AnimationEditor extends ApplicationV2 {
 		div.className = 'fua-ed';
 		const none = s.style === 'none';
 		const auto = autoSounds(s, this.previewElement);
+		const self = s.style === 'self';
+		const slots = [
+			['cast', 'On the user first'],
+			...(self ? [] : [['projectile', 'Projectile']]),
+			['hit', self ? 'On the user' : 'On each target'],
+			['after', 'Back on the user'],
+		];
+		const scopes = this.item
+			? [
+					['item', 'This item'],
+					...(canWorld ? [['world', `Every “${this.name}”`]] : []),
+					...(game.user.isGM && this.catKey ? [['category', `Every ${weaponOne(this.catKey)}`]] : []),
+				]
+			: [];
+		const colorKey = isHexColor(s.element) ? 'custom' : (s.element ?? 'auto');
 		div.innerHTML = `
 			<header>
-				<b>${esc(this.name)}</b>
-				<small>${esc(SOURCE_TEXT[this.source] ?? '')}${['default', 'guess'].includes(this.source) ? ` (${esc(PRESETS[activePreset()])} preset).` : ''}</small>
+				<div class="ttl">
+					<b>${esc(this.name)}</b>
+					<small>${esc(SOURCE_TEXT[this.source] ?? '')}${['default', 'guess'].includes(this.source) ? ` (${esc(PRESETS[activePreset()])} preset).` : ''}</small>
+				</div>
+				<label class="style"><span>Style</span><select data-k="style">${opts(STYLES, s.style)}</select></label>
 			</header>
-			<div class="grid">
-				<label class="wide"><span>Style</span><select data-k="style">${opts(STYLES, s.style)}</select></label>
-				${this.#slot('cast', 'On the user first', none)}
-				${this.#slot('projectile', 'Projectile', none || s.style === 'self')}
-				${this.#slot('hit', s.style === 'self' ? 'On the user' : 'On each target', none)}
-				${this.#slot('after', 'Back on the user after', none)}
-				<div class="snd colorpick ${none ? 'off' : ''}"><span>Color</span><div class="row"><select data-k="element" aria-label="Color">${opts({ ...ELEMENTS, custom: 'Custom color…' }, isHexColor(s.element) ? 'custom' : (s.element ?? 'auto'))}</select>${isHexColor(s.element) ? `<input type="color" data-k="elementColor" value="${esc(s.element)}" aria-label="Custom color" data-tooltip="Any color: recolors this animation in every preset, JB2A Free included">` : ''}</div></div>
-				<label ${none ? 'class="off"' : ''}><span>Size <output>${Number(s.scale ?? 1).toFixed(1)}×</output></span><input type="range" data-k="scale" min="0.5" max="2.5" step="0.1" value="${s.scale ?? 1}"></label>
-				<div class="snd ${none ? 'off' : ''}"><span>Sound on use</span><div class="row"><select data-k="castSound">${this.#soundOptions(s.castSound, auto.cast ?? auto.projectile)}</select><button type="button" class="play" data-action="playSound" data-which="cast" aria-label="Play the use sound" data-tooltip="Play">▶</button></div></div>
-				<div class="snd ${none ? 'off' : ''}"><span>Sound on hit</span><div class="row"><select data-k="hitSound">${this.#soundOptions(s.hitSound, auto.hit)}</select><button type="button" class="play" data-action="playSound" data-which="hit" aria-label="Play the hit sound" data-tooltip="Play">▶</button></div></div>
-			</div>
-			<div class="previews ${none ? 'off' : ''}">
-				<figure><div class="pv"><canvas width="150" height="150" data-prev="cast"></canvas></div><figcaption>On the user</figcaption></figure>
-				<figure><div class="pv"><canvas width="150" height="150" data-prev="hit"></canvas></div><figcaption>${s.style === 'self' ? 'On the user' : 'On the target'}</figcaption></figure>
-				<figure><div class="pv"><canvas width="150" height="150" data-prev="after"></canvas></div><figcaption>Back on the user</figcaption></figure>
-			</div>
-			${none ? '' : this.#impactHTML()}
 			${
-				this.item
-					? `<fieldset class="scope"><legend>Save for</legend>
-				<label><input type="radio" name="scope" value="item" ${this.scope === 'item' ? 'checked' : ''}> This item only</label>
-				${canWorld ? `<label><input type="radio" name="scope" value="world" ${this.scope === 'world' ? 'checked' : ''}> Every “${esc(this.name)}” in this world</label>` : ''}
-				${game.user.isGM && this.catKey ? `<label><input type="radio" name="scope" value="category" ${this.scope === 'category' ? 'checked' : ''}> Every ${esc(weaponOne(this.catKey))} in this world</label>` : ''}
-			</fieldset>`
-					: `<p class="note">${
-							this.fuid?.startsWith('wpn:')
-								? `Applies to every ${esc(weaponOne(this.fuid))} in this world, unless that weapon has its own animation (or one set for its name).`
-								: `Applies to every character and NPC with ${esc(this.name)}, unless one of their items has its own animation.`
-						}</p>`
+				none
+					? '<p class="empty">No animation. Pick a style to give it one.</p>'
+					: `<section class="slots n${slots.length}">${slots.map(([f, l]) => this.#slot(f, l)).join('')}</section>
+			<p class="hint">Click a box to choose its effect. Each one loops here as it will play.</p>
+			<div class="row">
+				<div class="fld colorpick"><span>Color</span><div class="in"><select data-k="element" aria-label="Color">${opts({ ...ELEMENTS, custom: 'Custom color…' }, colorKey)}</select>${isHexColor(s.element) ? `<input type="color" data-k="elementColor" value="${esc(s.element)}" aria-label="Custom color" data-tooltip="Any color: recolors this animation in every preset, JB2A Free included">` : ''}</div></div>
+				<label class="fld size"><span>Size <output>${Number(s.scale ?? 1).toFixed(1)}×</output></span><input type="range" data-k="scale" min="0.5" max="2.5" step="0.1" value="${s.scale ?? 1}"></label>
+			</div>
+			<div class="row">
+				<div class="fld"><span>Sound on use</span><div class="in"><select data-k="castSound">${this.#soundOptions(s.castSound, auto.cast ?? auto.projectile)}</select><button type="button" class="play" data-action="playSound" data-which="cast" aria-label="Play the use sound" data-tooltip="Play">▶</button></div></div>
+				<div class="fld"><span>Sound on hit</span><div class="in"><select data-k="hitSound">${this.#soundOptions(s.hitSound, auto.hit)}</select><button type="button" class="play" data-action="playSound" data-which="hit" aria-label="Play the hit sound" data-tooltip="Play">▶</button></div></div>
+			</div>
+			${this.#impactHTML()}`
+			}
+			${
+				scopes.length > 1
+					? `<div class="scope" role="radiogroup" aria-label="Save for"><span>Save for</span>${scopes.map(([v, l]) => `<label class="${this.scope === v ? 'on' : ''}"><input type="radio" name="scope" value="${v}" ${this.scope === v ? 'checked' : ''}>${esc(l)}</label>`).join('')}</div>`
+					: this.item
+						? ''
+						: `<p class="note">${
+								this.fuid?.startsWith('wpn:')
+									? `Applies to every ${esc(weaponOne(this.fuid))} in this world, unless that weapon has its own animation (or one set for its name).`
+									: `Applies to every character and NPC with ${esc(this.name)}, unless one of their items has its own animation.`
+							}</p>`
 			}
 			<footer>
-				<button type="button" data-action="preview" data-tooltip="Plays from your selected token at your targets">Preview on the scene</button>
+				<button type="button" data-action="preview" data-tooltip="Plays from your selected token at your targets"><i class="fa-solid fa-play"></i> Try on the scene</button>
 				<label class="crit"><input type="checkbox" data-crit ${this.previewCrit ? 'checked' : ''}> as a critical</label>
 				<span class="sp"></span>
 				<button type="button" data-action="reset">Reset</button>
@@ -234,10 +311,14 @@ export class AnimationEditor extends ApplicationV2 {
 		return div;
 	}
 
-	/** An effect slot: shows the choice, opens the grid picker */
-	#slot(field, label, off) {
+	/** An effect slot: a live preview of the choice; click it for the grid picker */
+	#slot(field, label) {
 		const id = this.spec[field];
-		return `<div class="snd slot ${off ? 'off' : ''}"><span>${esc(label)}</span><button type="button" class="pick" data-action="pick" data-field="${field}" aria-label="${esc(label)}: ${esc(id ? fxLabel(id) : 'None')}. Choose"><b>${esc(id ? fxLabel(id) : 'None')}</b><i class="fa-solid fa-table-cells-large"></i></button></div>`;
+		const name = id ? fxLabel(id) : 'None';
+		return `<button type="button" class="slot ${id ? '' : 'empty'}" data-action="pick" data-field="${field}" aria-label="${esc(label)}: ${esc(name)}. Choose">
+			<span class="pv"><canvas width="150" height="150" data-prev="${field}"></canvas>${id ? '' : '<i class="fa-solid fa-plus"></i>'}</span>
+			<small>${esc(label)}</small><b>${esc(name)}</b>
+		</button>`;
 	}
 
 	static #onPick(event, target) {
@@ -279,8 +360,9 @@ export class AnimationEditor extends ApplicationV2 {
 		};
 		const showCut = f.cutin;
 		const color = this.spec.cutinColor || `#${(f.color === 0xffd9a0 ? 0xf2c45a : f.color).toString(16).padStart(6, '0')}`;
-		return `<fieldset class="impact"><legend>Impact</legend>
-			<p class="hint">How hard it lands. Critical hits go one level up. Each player can still turn off shake, freeze, camera, darkening and cut-ins for themselves in the module settings.</p>
+		const custom = Object.keys(imp).length;
+		return `<details class="impact" ${this.impactOpen ? 'open' : ''}><summary><b>Impact</b><span>${esc(IMPACT_FIELDS.power.options[imp.power] ?? `Automatic: ${autoText('power', this.#feel({ impact: {} }))}`)}${custom ? ` · ${custom} changed` : ''}</span></summary>
+			<p class="hint">How hard it lands: freeze, shake, camera, darkening, debris and a cut-in for big moves. Critical hits go one level up. Each player can turn these off for themselves in the module settings.</p>
 			<div class="grid3">
 				${field('power')}${field('freeze')}${field('shake')}
 				${field('camera')}${field('dim')}${field('windup')}
@@ -296,7 +378,7 @@ export class AnimationEditor extends ApplicationV2 {
 					<button type="button" data-action="previewCutin">Preview</button>
 				</div></div>
 			</div>
-		</fieldset>`;
+		</details>`;
 	}
 
 	static #onPickPortrait() {
@@ -341,7 +423,10 @@ export class AnimationEditor extends ApplicationV2 {
 	_replaceHTML(result, content) {
 		for (const p of this.previews) p.stop();
 		this.previews = [];
+		// keep the scroll position: most changes re-draw the window
+		const top = content.scrollTop;
 		content.replaceChildren(result);
+		content.scrollTop = top;
 	}
 
 	_onRender() {
@@ -386,7 +471,13 @@ export class AnimationEditor extends ApplicationV2 {
 			}),
 		);
 		root.querySelector('[data-crit]')?.addEventListener('change', (ev) => (this.previewCrit = ev.target.checked));
-		root.querySelectorAll('input[name="scope"]').forEach((el) => el.addEventListener('change', () => (this.scope = el.value)));
+		root.querySelectorAll('input[name="scope"]').forEach((el) =>
+			el.addEventListener('change', () => {
+				this.scope = el.value;
+				root.querySelectorAll('.scope label').forEach((l) => l.classList.toggle('on', l.contains(el)));
+			}),
+		);
+		root.querySelector('details.impact')?.addEventListener('toggle', (ev) => (this.impactOpen = ev.target.open));
 	}
 
 	/** Where the color picker starts: the color the animation shows now */
@@ -487,7 +578,7 @@ export class AnimationEditor extends ApplicationV2 {
 /*  Effect picker: every effect as a tile, still until you hover it     */
 /* ------------------------------------------------------------------ */
 
-/** One tile's preview: pixel effects get a still frame and play on hover; JB2A videos play on hover */
+/** One tile's preview: a still frame (kept between picker opens), played on hover */
 class Tile {
 	constructor(el, id, element) {
 		this.el = el;
@@ -495,21 +586,43 @@ class Tile {
 		this.element = element;
 		this.canvas = el.querySelector('canvas');
 	}
+	#paint(src) {
+		const ctx = this.canvas.getContext('2d');
+		ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		ctx.drawImage(src, 0, 0, this.canvas.width, this.canvas.height);
+	}
 	/** a frame from the middle of the effect, drawn once */
 	still() {
 		if (this.drawn || !isPixel(this.id)) return;
 		this.drawn = true;
+		this.canvas.style.filter = PIXEL[this.id].ramp ? 'none' : cssFilter(PIXEL[this.id], this.element);
+		const key = `${this.id}|${this.element}`;
+		const kept = STILLS.get(key);
+		if (kept) return this.#paint(kept);
 		this.px = new PixelPreview(this.canvas);
 		this.px.set(this.id, this.element);
 		// projectiles are caught mid-flight, the rest around their peak
 		const at = PIXEL[this.id].proj || PIXEL[this.id].line ? 0.6 : 0.45;
 		const steps = Math.round(Math.min(1.4, (pixelDuration(this.id) / 1000) * at) * 30);
 		for (let i = 0; i < steps; i++) this.px.frame(1 / 30);
-		this.canvas.style.filter = PIXEL[this.id].ramp ? 'none' : cssFilter(PIXEL[this.id], this.element);
+		STILLS.set(key, copyCanvas(this.canvas));
+	}
+	/** JB2A: one frame from its video, fetched in the background */
+	async jbStill() {
+		if (this.drawn || !isJb(this.id)) return;
+		this.drawn = true;
+		this.canvas.style.filter = cssFilter(JBFX[this.id], this.element);
+		const st = await jbStill(this.id, this.canvas.width);
+		if (st && !this.vid) this.#paint(st);
+	}
+	get kind() {
+		return isPixel(this.id) ? 'pixel' : isJb(this.id) && jbModule() ? 'jb' : null;
 	}
 	play() {
 		if (isPixel(this.id)) {
 			this.still();
+			this.px ??= new PixelPreview(this.canvas);
+			this.px.set(this.id, this.element);
 			let last = performance.now();
 			const loop = (t) => {
 				this.raf = requestAnimationFrame(loop);
@@ -517,20 +630,31 @@ class Tile {
 				last = t;
 			};
 			this.raf = requestAnimationFrame(loop);
-		} else if (isJb(this.id) && jbModule()) {
-			const fx = JBFX[this.id];
-			const file = fx.file ?? (fx.variants.find((x) => x.ft === 30) ?? fx.variants[0]).file;
+		} else if (this.kind === 'jb') {
 			if (!this.vid) {
-				this.vid = Object.assign(document.createElement('video'), { muted: true, loop: true, playsInline: true, src: `modules/${jbModule()}/${file}` });
-				this.vid.style.filter = cssFilter(fx, this.element);
-				this.canvas.replaceWith(this.vid);
+				this.vid = Object.assign(document.createElement('video'), { muted: true, loop: true, playsInline: true, preload: 'auto', src: jbUrl(this.id) });
+				this.vid.style.filter = cssFilter(JBFX[this.id], this.element);
+				// keep the still showing until the clip can play
+				this.vid.addEventListener(
+					'playing',
+					() => {
+						this.vid.classList.remove('loading');
+						if (this.canvas.isConnected) this.canvas.replaceWith(this.vid);
+					},
+					{ once: true },
+				);
+				this.canvas.after(this.vid);
+				this.vid.classList.add('loading');
 			}
+			this.el.classList.add('busy');
+			this.vid.addEventListener('playing', () => this.el.classList.remove('busy'), { once: true });
 			this.vid.play().catch(() => {});
 		}
 	}
 	stop() {
 		cancelAnimationFrame(this.raf);
 		this.vid?.pause();
+		this.el.classList.remove('busy');
 	}
 	destroy() {
 		this.stop();
@@ -592,6 +716,7 @@ export class EffectPicker extends ApplicationV2 {
 
 	_onRender() {
 		const root = this.element;
+		this.closing = false;
 		const search = root.querySelector('input[type="search"]');
 		const filter = () => {
 			const q = search.value.trim().toLowerCase();
@@ -613,33 +738,46 @@ export class EffectPicker extends ApplicationV2 {
 				filter();
 			}),
 		);
-		// still frames for the tiles that scroll into view, a few at a time so the window stays responsive
-		const queue = [];
+		// still frames for the tiles that scroll into view: pixel ones one per tick so the window stays
+		// responsive, JB2A ones three videos at a time
+		const pixelQ = [];
+		const jbQ = [];
 		let busy = false;
+		let jbBusy = 0;
 		const pump = () => {
-			if (busy) return;
-			busy = true;
-			const step = () => {
-				const t = queue.shift();
-				if (!t) return (busy = false);
-				t.still();
-				setTimeout(step, 0);
-			};
-			step();
+			if (!busy && pixelQ.length) {
+				busy = true;
+				const step = () => {
+					const t = pixelQ.shift();
+					if (!t || this.closing) return (busy = false);
+					t.still();
+					setTimeout(step, 0);
+				};
+				step();
+			}
+			while (jbBusy < 3 && jbQ.length && !this.closing) {
+				const t = jbQ.shift();
+				jbBusy++;
+				t.jbStill().finally(() => {
+					jbBusy--;
+					pump();
+				});
+			}
 		};
 		this.io = new IntersectionObserver((entries) => {
 			for (const e of entries) if (e.isIntersecting) {
-				queue.push(e.target._tile);
+				const t = e.target._tile;
+				(t.kind === 'jb' ? jbQ : pixelQ).push(t);
 				this.io.unobserve(e.target);
 			}
 			pump();
-		}, { root: root.querySelector('.grid-wrap'), rootMargin: '120px' });
+		}, { root: root.querySelector('.grid-wrap'), rootMargin: '160px' });
 		for (const el of root.querySelectorAll('.tile')) {
 			const id = el.dataset.id;
 			if (id) {
 				el._tile = new Tile(el, id, this.opts.element);
 				this.tiles.push(el._tile);
-				if (isPixel(id)) this.io.observe(el);
+				if (el._tile.kind) this.io.observe(el);
 				el.addEventListener('mouseenter', () => el._tile.play());
 				el.addEventListener('mouseleave', () => el._tile.stop());
 			}
@@ -653,6 +791,7 @@ export class EffectPicker extends ApplicationV2 {
 	}
 
 	#teardown() {
+		this.closing = true;
 		this.io?.disconnect();
 		for (const t of this.tiles) t.destroy();
 		this.tiles = [];
