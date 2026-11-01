@@ -287,7 +287,7 @@ function cutInFor(plan, F) {
 		const z = ZERO_EFFECTS[zeroKey(plan)];
 		return I.cutIn({ ...base, color: spec.cutinColor || (z ? hex(z.color) : base.color), kind: 'limit', kicker: z ? z.label : plan.itemType === 'zeroPower' ? 'Zero Power' : 'Limit Break', ms: 1900 });
 	}
-	if (F.boss) return I.cutIn({ ...base, kind: 'boss', kicker: plan.boss?.villain ? `${plan.boss.villain} villain` : 'Champion', ms: 1400 });
+	if (F.boss) return I.cutIn({ ...base, kind: 'boss', kicker: plan.boss?.villain ? `${plan.boss.villain} villain` : plan.boss?.elite ? 'Elite' : 'Champion', ms: 1400 });
 	return I.cutIn({ ...base, ms: 1300 });
 }
 
