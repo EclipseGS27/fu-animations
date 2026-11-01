@@ -284,14 +284,15 @@ export const isZeroPower = (item) => item?.type === 'optionalFeature' && item?.s
 /** The kind of item, as the impact levels see it ('zeroPower' for Zero Powers) */
 export const itemKind = (item) => (isZeroPower(item) ? 'zeroPower' : (item?.type ?? null));
 
-/** A champion or villain: its attacks play like a boss's */
+/** A champion or villain (and an elite, by the "Elites count as bosses" setting): its attacks play like a boss's */
 export function bossOf(actor) {
 	const s = actor?.system;
 	if (!s || actor.type !== 'npc') return null;
 	const rank = s.rank?.value;
 	const villain = s.villain?.value || '';
-	if (rank !== 'champion' && !villain) return null;
-	return { champion: rank === 'champion' ? Number(s.rank?.replacedSoldiers) || 1 : 0, villain };
+	const elite = rank === 'elite' && getSetting('bossElites') !== false;
+	if (rank !== 'champion' && !villain && !elite) return null;
+	return { champion: rank === 'champion' ? Number(s.rank?.replacedSoldiers) || 1 : 0, elite: rank === 'elite', villain };
 }
 
 /** A limit break for a Zero Power nobody set an animation for, from its damage type */
