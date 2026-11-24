@@ -279,7 +279,7 @@ function basicSpec(item) {
  * @param {{offensive?:boolean, hasTargets?:boolean, damageType?:string}} ctx
  */
 /** Project FU keeps Zero Powers as optional features */
-export const isZeroPower = (item) => item?.type === 'optionalFeature' && (item?.system?.data?.type ?? item?.system?.optionalType) === 'projectfu.zeroPower';
+export const isZeroPower = (item) => item?.type === 'optionalFeature' && (item?.system?.optionalType ?? item?.system?.data?.type) === 'projectfu.zeroPower';
 
 /** The kind of item, as the impact levels see it ('zeroPower' for Zero Powers) */
 export const itemKind = (item) => (isZeroPower(item) ? 'zeroPower' : (item?.type ?? null));

@@ -1,5 +1,6 @@
 import { ABILITIES, MODULE_ID, PRESETS, describe, resolveSpec } from './presets.mjs';
 import { jbAvailable } from './jbcore.mjs';
+import { probeSoundPack } from './audio.mjs';
 import { refreshBobbing, resetLayer, resetMotion } from './player.mjs';
 import { SOCKET, planFromMessage, runPlan } from './sequence.mjs';
 import { AnimationEditor, AnimationLibrary } from './editor.mjs';
@@ -62,6 +63,7 @@ Hooks.once('init', () => {
 
 Hooks.once('ready', () => {
 	if (game.system.id !== 'projectfu') return ui.notifications.warn('Fabula Ultima Battle Animations needs the Project FU system.');
+	probeSoundPack();
 	if (game.user.isGM && game.settings.get(MODULE_ID, 'preset') === 'jb2a' && !jbAvailable()) ui.notifications.warn('Battle Animations: the JB2A preset is on but the JB2A module is not active, so the Original preset plays. Turn on "JB2A - Free Content" in Manage Modules.');
 	game.socket.on(SOCKET, (msg) => {
 		if (msg?.type === 'play') runPlan(msg.plan);

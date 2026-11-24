@@ -12,11 +12,40 @@ const ROOT = `modules/${MODULE_ID}/sfx/`;
 const PLAIN_HITS = new Set(['px-impact-sym-1', 'px-impact-sym-6', 'impact-flash-1', 'impact-flash-2', 'impact-flash-3', 'cast-glow-3', 'cast-glow-4']);
 
 /**
+ * The sound pack is not part of the module (its license forbids redistribution). Check once whether it has been
+ * added to sfx/; without it, animations play silently instead of failing to load a file every time.
+ * @type {boolean|null|Promise<boolean>}
+ */
+let packPresent = null;
+export function probeSoundPack() {
+	if (packPresent !== null) return packPresent;
+	const first = Object.values(SOUNDS).find((s) => s.files?.length)?.files[0];
+	packPresent = (async () => {
+		if (!first) return false;
+		try {
+			const res = await fetch(foundry.utils.getRoute(ROOT + first), { method: 'HEAD' });
+			return res.ok;
+		} catch {
+			return false;
+		}
+	})().then((ok) => {
+		packPresent = ok;
+		if (!ok) console.info(`${MODULE_ID} | no sound pack in modules/${MODULE_ID}/sfx/: animations play without sound (see the README, "Assets not included")`);
+		return ok;
+	});
+	return packPresent;
+}
+
+/**
  * @param {string} id sound id from SOUNDS
  * @param {{volume?: number}} opts
  */
 export function playSound(id, { volume = 1 } = {}) {
 	if (!id || id === 'none' || getSetting('sound') === false) return null;
+	if (packPresent !== true) {
+		probeSoundPack();
+		return null;
+	}
 	const s = SOUNDS[id];
 	if (!s?.files?.length) return null;
 	const file = s.files[Math.floor(Math.random() * s.files.length)];
